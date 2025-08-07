@@ -12,7 +12,7 @@ module.exports = {
   collectCoverageFrom: [
     'src/**/*.ts',
     '!src/**/*.d.ts',
-    '!src/generated/**/*',
+    '!src/generated/**/*', // Exclude generated files from coverage
   ],
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html'],
@@ -20,4 +20,9 @@ module.exports = {
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
   },
+  // Ignore generated files for coverage but still test them
+  coveragePathIgnorePatterns: [
+    '/node_modules/',
+    '/src/generated/'
+  ],
 }; 
