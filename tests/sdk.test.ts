@@ -1,19 +1,25 @@
 import { ChunkRequest, CompletionRequest, EmbeddingRequest, RAGClient, RAGSDK, SummarizeRequest } from '../src/sdk';
 
-// Mock axios für Tests
+// Mock axios
 jest.mock('axios', () => ({
-  create: jest.fn(() => ({
-    post: jest.fn()
-  }))
+  create: jest.fn()
 }));
 
 describe('RAGSDK', () => {
   let ragSDK: RAGSDK;
   let ragClient: RAGClient;
+  let mockPost: jest.Mock;
+  let mockAxiosCreate: jest.Mock;
   const baseURL = 'https://test-rag-endpoint.com';
   const apiKey = 'test-api-key';
 
   beforeEach(() => {
+    // Reset mocks
+    jest.clearAllMocks();
+    mockPost = jest.fn();
+    mockAxiosCreate = require('axios').create as jest.Mock;
+    mockAxiosCreate.mockReturnValue({ post: mockPost });
+    
     ragSDK = new RAGSDK({ baseURL, apiKey });
     ragClient = new RAGClient({ baseURL, apiKey });
   });
@@ -49,6 +55,185 @@ describe('RAGSDK', () => {
       };
       const client = new RAGClient(config);
       expect(client).toBeInstanceOf(RAGClient);
+    });
+
+    it('should configure axios with correct settings', () => {
+      const config = { baseURL: 'https://test.com', apiKey: 'test-key' };
+      new RAGClient(config);
+      
+      expect(mockAxiosCreate).toHaveBeenCalledWith({
+        baseURL: 'https://test.com',
+        headers: {
+          'Authorization': 'Bearer test-key',
+          'Content-Type': 'application/json'
+        }
+      });
+    });
+  });
+
+  describe('generateCompletion', () => {
+    it('should generate completion successfully', async () => {
+      const mockResponse = {
+        data: {
+          result: 'RAG ist eine Technik zur Erweiterung von LLMs mit externen Datenquellen.',
+          tokens_used: 25
+        }
+      };
+      mockPost.mockResolvedValue(mockResponse);
+
+      const request: CompletionRequest = {
+        prompt: 'Erkläre RAG',
+        max_tokens: 100,
+        temperature: 0.7
+      };
+
+      const result = await ragClient.generateCompletion(request);
+      
+      expect(mockPost).toHaveBeenCalledWith('/completion', request);
+      expect(result).toEqual(mockResponse.data);
+    });
+
+    it('should handle completion errors', async () => {
+      const error = new Error('API Error');
+      mockPost.mockRejectedValue(error);
+
+      const request: CompletionRequest = {
+        prompt: 'Test prompt'
+      };
+
+      await expect(ragClient.generateCompletion(request))
+        .rejects
+        .toThrow('Completion generation failed:');
+    });
+  });
+
+  describe('createEmbeddings', () => {
+    it('should create embeddings successfully with string input', async () => {
+      const mockResponse = {
+        data: {
+          vector: [0.1, 0.2, 0.3, 0.4, 0.5],
+          model: 'text-embedding-ada-002'
+        }
+      };
+      mockPost.mockResolvedValue(mockResponse);
+
+      const request: EmbeddingRequest = {
+        input: 'Test text',
+        model: 'text-embedding-ada-002'
+      };
+
+      const result = await ragClient.createEmbeddings(request);
+      
+      expect(mockPost).toHaveBeenCalledWith('/embedding', request);
+      expect(result).toEqual(mockResponse.data);
+    });
+
+    it('should create embeddings successfully with array input', async () => {
+      const mockResponse = {
+        data: {
+          vectors: [[0.1, 0.2], [0.3, 0.4]],
+          model: 'text-embedding-ada-002'
+        }
+      };
+      mockPost.mockResolvedValue(mockResponse);
+
+      const request: EmbeddingRequest = {
+        input: ['Text 1', 'Text 2'],
+        model: 'text-embedding-ada-002'
+      };
+
+      const result = await ragClient.createEmbeddings(request);
+      
+      expect(mockPost).toHaveBeenCalledWith('/embedding', request);
+      expect(result).toEqual(mockResponse.data);
+    });
+
+    it('should handle embedding errors', async () => {
+      const error = new Error('Invalid input');
+      mockPost.mockRejectedValue(error);
+
+      const request: EmbeddingRequest = {
+        input: ''
+      };
+
+      await expect(ragClient.createEmbeddings(request))
+        .rejects
+        .toThrow('Embedding creation failed:');
+    });
+  });
+
+  describe('chunkText', () => {
+    it('should chunk text successfully', async () => {
+      const mockResponse = {
+        data: {
+          total_chunks: 2,
+          chunks: [
+            { text: 'Dies ist der erste Chunk', index: 0 },
+            { text: 'Dies ist der zweite Chunk', index: 1 }
+          ]
+        }
+      };
+      mockPost.mockResolvedValue(mockResponse);
+
+      const request: ChunkRequest = {
+        text: 'Dies ist ein langer Text',
+        chunk_size: 100,
+        overlap: 20
+      };
+
+      const result = await ragClient.chunkText(request);
+      
+      expect(mockPost).toHaveBeenCalledWith('/chunk', request);
+      expect(result).toEqual(mockResponse.data);
+    });
+
+    it('should handle chunking errors', async () => {
+      const error = new Error('Chunking failed');
+      mockPost.mockRejectedValue(error);
+
+      const request: ChunkRequest = {
+        text: ''
+      };
+
+      await expect(ragClient.chunkText(request))
+        .rejects
+        .toThrow('Text chunking failed:');
+    });
+  });
+
+  describe('summarizeText', () => {
+    it('should summarize text successfully', async () => {
+      const mockResponse = {
+        data: {
+          summary: 'Kurze Zusammenfassung des Textes.',
+          original_length: 500,
+          summary_length: 50
+        }
+      };
+      mockPost.mockResolvedValue(mockResponse);
+
+      const request: SummarizeRequest = {
+        text: 'Ein sehr langer Text...',
+        max_length: 100
+      };
+
+      const result = await ragClient.summarizeText(request);
+      
+      expect(mockPost).toHaveBeenCalledWith('/summarize', request);
+      expect(result).toEqual(mockResponse.data);
+    });
+
+    it('should handle summarization errors', async () => {
+      const error = new Error('Text too short');
+      mockPost.mockRejectedValue(error);
+
+      const request: SummarizeRequest = {
+        text: 'Kurz'
+      };
+
+      await expect(ragClient.summarizeText(request))
+        .rejects
+        .toThrow('Text summarization failed:');
     });
   });
 
