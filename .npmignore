@@ -1,0 +1,45 @@
+# Source files
+src/
+openapi/
+orval.config.ts
+
+# Development files
+.gitignore
+.npmignore
+tsconfig.json
+
+# Development dependencies
+node_modules/
+
+# Build artifacts (except dist)
+*.tsbuildinfo
+
+# Test files
+test/
+tests/
+__tests__/
+*.test.ts
+*.spec.ts
+
+# Documentation
+docs/
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment files
+.env* 

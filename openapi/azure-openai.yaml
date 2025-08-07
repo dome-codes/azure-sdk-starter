@@ -1,0 +1,213 @@
+openapi: 3.0.0
+info:
+  title: RAG API
+  version: 1.0.0
+  description: Retrieval-Augmented Generation API
+servers:
+  - url: https://your-rag-endpoint.com
+    description: RAG API Server
+security:
+  - BearerAuth: []
+paths:
+  /completion:
+    post:
+      operationId: Completion_create
+      summary: Generate text completion
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompletionRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompletionResponse'
+
+  /embedding:
+    post:
+      operationId: Embedding_create
+      summary: Create embeddings for text
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmbeddingRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbeddingResponse'
+
+  /chunk:
+    post:
+      operationId: Chunk_create
+      summary: Split text into chunks
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChunkRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChunkResponse'
+
+  /summarize:
+    post:
+      operationId: Summarize_create
+      summary: Summarize text
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SummarizeRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SummarizeResponse'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    CompletionRequest:
+      type: object
+      required:
+        - prompt
+      properties:
+        prompt:
+          type: string
+          description: The text prompt for completion
+        max_tokens:
+          type: integer
+          description: Maximum number of tokens to generate
+          default: 100
+        temperature:
+          type: number
+          format: float
+          description: Sampling temperature (0.0 to 2.0)
+          default: 0.7
+          minimum: 0
+          maximum: 2
+    CompletionResponse:
+      type: object
+      properties:
+        result:
+          type: string
+          description: Generated text completion
+        tokens_used:
+          type: integer
+          description: Number of tokens used
+    EmbeddingRequest:
+      type: object
+      required:
+        - input
+      properties:
+        input:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
+          description: Text or array of texts to embed
+        model:
+          type: string
+          description: Embedding model to use
+          default: "text-embedding-ada-002"
+    EmbeddingResponse:
+      type: object
+      properties:
+        vector:
+          type: array
+          items:
+            type: number
+          description: Embedding vector
+        model:
+          type: string
+          description: Model used for embedding
+    ChunkRequest:
+      type: object
+      required:
+        - text
+      properties:
+        text:
+          type: string
+          description: Text to split into chunks
+        chunk_size:
+          type: integer
+          description: Size of each chunk in characters
+          default: 1000
+        overlap:
+          type: integer
+          description: Overlap between chunks in characters
+          default: 200
+    ChunkResponse:
+      type: object
+      properties:
+        chunks:
+          type: array
+          items:
+            type: object
+            properties:
+              text:
+                type: string
+                description: Chunk text
+              start:
+                type: integer
+                description: Start position in original text
+              end:
+                type: integer
+                description: End position in original text
+        total_chunks:
+          type: integer
+          description: Total number of chunks created
+    SummarizeRequest:
+      type: object
+      required:
+        - text
+      properties:
+        text:
+          type: string
+          description: Text to summarize
+        max_length:
+          type: integer
+          description: Maximum length of summary
+          default: 200
+    SummarizeResponse:
+      type: object
+      properties:
+        summary:
+          type: string
+          description: Generated summary
+        original_length:
+          type: integer
+          description: Length of original text
+        summary_length:
+          type: integer
+          description: Length of generated summary
