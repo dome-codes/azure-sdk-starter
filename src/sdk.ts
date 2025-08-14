@@ -1,4 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
+import { AuthManager } from './auth';
 
 // Types für die RAG API Requests
 export interface CompletionRequest {
@@ -30,28 +31,133 @@ export interface SummarizeRequest {
 // Configuration Interface
 export interface RAGConfig {
   baseURL?: string;
-  apiKey?: string;
+  username?: string;
+  password?: string;
+  authUrl?: string;
+  clientId?: string;
+  clientSecret?: string;
+  scope?: string;
+  apiKey?: string; // Fallback für direkte API-Key-Nutzung
   headers?: Record<string, string>;
 }
 
 export class RAGClient {
   private client: AxiosInstance;
+  private authManager: AuthManager | null = null;
+  private useAuth: boolean = false;
+  private config: RAGConfig; // Added this line to store config
 
   constructor(config: RAGConfig = {}) {
+    this.config = config; // Initialize config
     const {
       baseURL = 'https://your-rag-endpoint.com',
+      username,
+      password,
+      authUrl,
+      clientId,
+      clientSecret,
+      scope,
       apiKey = 'YOUR_API_KEY',
       headers = {}
     } = config;
 
+    // Wenn Username/Passwort vorhanden, AuthManager verwenden
+    if (username && password) {
+      this.useAuth = true;
+      this.authManager = new AuthManager({
+        username,
+        password,
+        authUrl,
+        clientId,
+        clientSecret,
+        scope
+      });
+    }
+
     this.client = axios.create({
       baseURL,
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
         ...headers
       }
     });
+
+    // Axios Interceptor für automatische Token-Verwaltung
+    this.setupAuthInterceptor();
+  }
+
+  /**
+   * Richtet den Axios Interceptor für automatische Authentifizierung ein
+   */
+  private setupAuthInterceptor(): void {
+    this.client.interceptors.request.use(async (config) => {
+      if (this.useAuth && this.authManager) {
+        try {
+          const token = await this.authManager.getValidToken();
+          config.headers.Authorization = `Bearer ${token}`;
+        } catch (error) {
+          console.warn('Failed to get valid token:', error);
+          // Fallback zu API-Key falls vorhanden
+          if (config.headers.Authorization) {
+            config.headers.Authorization = `Bearer ${config.headers.Authorization}`;
+          }
+        }
+      } else {
+        // Fallback zu API-Key - verwende den gespeicherten Wert
+        const apiKey = this.config?.apiKey || 'YOUR_API_KEY';
+        config.headers.Authorization = `Bearer ${apiKey}`;
+      }
+      return config;
+    });
+
+    // Response Interceptor für Token-Refresh bei 401
+    this.client.interceptors.response.use(
+      (response) => response,
+      async (error) => {
+        if (error.response?.status === 401 && this.useAuth && this.authManager) {
+          try {
+            // Token refresh versuchen
+            const newToken = await this.authManager.getValidToken();
+            // Request mit neuem Token wiederholen
+            const originalRequest = error.config;
+            originalRequest.headers.Authorization = `Bearer ${newToken}`;
+            return this.client(originalRequest);
+          } catch (refreshError) {
+            console.error('Token refresh failed:', refreshError);
+          }
+        }
+        return Promise.reject(error);
+      }
+    );
+  }
+
+  /**
+   * Authentifiziert den Benutzer (nur bei Username/Passwort-Auth)
+   */
+  async authenticate(): Promise<string | null> {
+    if (this.authManager) {
+      return this.authManager.authenticate();
+    }
+    return null;
+  }
+
+  /**
+   * Gibt den aktuellen Token-Status zurück
+   */
+  getTokenStatus() {
+    if (this.authManager) {
+      return this.authManager.getTokenStatus();
+    }
+    return null;
+  }
+
+  /**
+   * Löscht alle gespeicherten Tokens
+   */
+  clearTokens(): void {
+    if (this.authManager) {
+      this.authManager.clearTokens();
+    }
   }
 
   async generateCompletion(params: CompletionRequest) {
@@ -96,5 +202,26 @@ export class RAGSDK {
 
   constructor(config?: RAGConfig) {
     this.rag = new RAGClient(config);
+  }
+
+  /**
+   * Authentifiziert den Benutzer
+   */
+  async authenticate(): Promise<string | null> {
+    return this.rag.authenticate();
+  }
+
+  /**
+   * Gibt den Token-Status zurück
+   */
+  getTokenStatus() {
+    return this.rag.getTokenStatus();
+  }
+
+  /**
+   * Löscht alle gespeicherten Tokens
+   */
+  clearTokens(): void {
+    this.rag.clearTokens();
   }
 }
