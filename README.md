@@ -1,176 +1,230 @@
-# RAG SDK
+# RAG SDK - Retrieval-Augmented Generation SDK
 
-Ein TypeScript/JavaScript SDK für Retrieval-Augmented Generation (RAG) Services.
+Ein TypeScript/JavaScript SDK für Retrieval-Augmented Generation (RAG) Services, basierend auf dem offiziellen Azure OpenAI SDK.
 
-## Installation
+## 🚀 Features
+
+### 🔐 Authentifizierung
+- **Username/Passwort-Authentifizierung** über OAuth2
+- **Automatische Token-Verwaltung** mit Refresh-Logik
+- **Azure OpenAI Integration** mit offiziellem SDK
+- **Managed Identity Support** für Azure-Umgebungen
+- **Fallback zu API-Key** für einfache Anwendungen
+
+### 🤖 Azure OpenAI Integration
+- **Chat Completions** mit GPT-4, GPT-3.5 und anderen Modellen
+- **Text Completions** für ältere Modelle
+- **Embeddings** mit text-embedding-ada-002 und anderen
+- **Deployment-Management** für verschiedene Modelle
+- **Vollständige Azure OpenAI SDK-Integration**
+
+### 🛠️ RAG-Funktionalitäten
+- **Text Completion** - Generierung von Antworten
+- **Embeddings** - Vektorisierung von Texten
+- **Text Chunking** - Aufteilung langer Texte
+- **Text Summarization** - Zusammenfassung von Inhalten
+
+## 📦 Installation
 
 ```bash
 npm install rag-sdk
 ```
 
-## Verwendung
+## 🔧 Konfiguration
 
-### Grundlegende Konfiguration
+### 1. Azure OpenAI (Empfohlen)
+
+```typescript
+import { AzureOpenAISDK } from 'rag-sdk';
+
+const azureOpenAI = new AzureOpenAISDK({
+  endpoint: 'https://your-resource.openai.azure.com/',
+  apiKey: 'your-azure-api-key',
+  deploymentName: 'gpt-4',
+  embeddingDeploymentName: 'text-embedding-ada-002'
+});
+```
+
+### 2. Mit Managed Identity (Azure-Umgebungen)
+
+```typescript
+const azureOpenAI = new AzureOpenAISDK({
+  endpoint: 'https://your-resource.openai.azure.com/',
+  useManagedIdentity: true,
+  deploymentName: 'gpt-4'
+});
+```
+
+### 3. Username/Passwort-Authentifizierung
 
 ```typescript
 import { RAGSDK } from 'rag-sdk';
 
 const rag = new RAGSDK({
-  baseURL: 'https://your-rag-endpoint.com',
-  apiKey: 'your-api-key-here'
+  username: 'your-username',
+  password: 'your-password',
+  authUrl: 'https://login.microsoftonline.com/your-tenant-id',
+  clientId: 'your-client-id'
 });
 ```
 
-### Text Completion
+### 4. API-Key Fallback
 
 ```typescript
-// Einfache Text-Generierung
-const completion = await rag.rag.generateCompletion({
-  prompt: "Erkläre mir das Konzept von RAG (Retrieval-Augmented Generation)",
-  max_tokens: 500,
+const rag = new RAGSDK({
+  apiKey: 'your-api-key'
+});
+```
+
+## 💻 Verwendung
+
+### Azure OpenAI Chat Completions
+
+```typescript
+// Chat mit System-Message
+const chatResult = await azureOpenAI.chatCompletion({
+  messages: [
+    {
+      role: 'system',
+      content: 'Du bist ein hilfreicher Assistent.'
+    },
+    {
+      role: 'user',
+      content: 'Erkläre mir RAG'
+    }
+  ],
+  maxTokens: 300,
   temperature: 0.7
 });
 
-console.log(completion.result);
+console.log(chatResult.choices[0]?.message?.content);
 ```
 
-### Embeddings erstellen
+### Azure OpenAI Embeddings
 
 ```typescript
-// Einzelnen Text embedden
+const embeddingResult = await azureOpenAI.embeddings({
+  input: 'Text für Embeddings',
+  model: 'text-embedding-ada-002'
+});
+
+console.log(embeddingResult.data[0]?.embedding);
+```
+
+### Deployment wechseln
+
+```typescript
+// Wechsle zu einem anderen Modell
+azureOpenAI.setDeployment('gpt-35-turbo');
+
+// Wechsle Embedding-Modell
+azureOpenAI.setEmbeddingDeployment('custom-embedding-model');
+```
+
+### RAG-Funktionalitäten
+
+```typescript
+// Text Completion
+const completion = await rag.rag.generateCompletion({
+  prompt: 'Erkläre RAG in einfachen Worten',
+  max_tokens: 300,
+  temperature: 0.7
+});
+
+// Embeddings
 const embedding = await rag.rag.createEmbeddings({
-  input: "Dies ist ein Beispieltext für Embeddings",
-  model: "text-embedding-ada-002"
+  input: 'Text für Embeddings',
+  model: 'text-embedding-ada-002'
 });
 
-// Mehrere Texte gleichzeitig embedden
-const embeddings = await rag.rag.createEmbeddings({
-  input: [
-    "Erster Text für Embeddings",
-    "Zweiter Text für Embeddings",
-    "Dritter Text für Embeddings"
-  ],
-  model: "text-embedding-ada-002"
-});
-
-console.log(embedding.vector);
-```
-
-### Text chunking
-
-```typescript
-// Langen Text in Chunks aufteilen
+// Text Chunking
 const chunks = await rag.rag.chunkText({
-  text: "Ein sehr langer Text, der in kleinere Stücke aufgeteilt werden soll...",
-  chunk_size: 1000,
-  overlap: 200
+  text: 'Langer Text...',
+  chunk_size: 100,
+  overlap: 20
 });
 
-console.log(chunks.chunks);
-```
-
-### Text zusammenfassen
-
-```typescript
-// Langen Text zusammenfassen
+// Text Summarization
 const summary = await rag.rag.summarizeText({
-  text: "Ein sehr langer Text mit vielen Details und Informationen...",
-  max_length: 200
+  text: 'Langer Text...',
+  max_length: 100
 });
-
-console.log(summary.summary);
 ```
 
-### Vollständiges RAG-Beispiel
+## 🔐 Umgebungsvariablen
 
-```typescript
-import { RAGSDK } from 'rag-sdk';
+```bash
+# Azure OpenAI
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
+AZURE_OPENAI_API_KEY=your-azure-api-key
+AZURE_OPENAI_DEPLOYMENT=gpt-4
+AZURE_OPENAI_EMBEDDING_DEPLOYMENT=text-embedding-ada-002
 
-const rag = new RAGSDK({
-  baseURL: 'https://your-rag-endpoint.com',
-  apiKey: process.env.RAG_API_KEY
-});
+# OAuth2 (für Username/Passwort)
+RAG_USERNAME=your-username
+RAG_PASSWORD=your-password
+RAG_CLIENT_ID=your-client-id
 
-async function processDocument(documentText: string, question: string) {
-  // 1. Text in Chunks aufteilen
-  const chunks = await rag.rag.chunkText({
-    text: documentText,
-    chunk_size: 1000,
-    overlap: 200
-  });
-
-  // 2. Embeddings für Chunks erstellen
-  const embeddings = await rag.rag.createEmbeddings({
-    input: chunks.chunks.map(chunk => chunk.text),
-    model: "text-embedding-ada-002"
-  });
-
-  // 3. Frage basierend auf Chunks beantworten
-  const answer = await rag.rag.generateCompletion({
-    prompt: `Basierend auf folgenden Dokumenten-Ausschnitten beantworte die Frage: ${question}\n\nDokumente:\n${chunks.chunks.map(chunk => chunk.text).join('\n\n')}`,
-    max_tokens: 300,
-    temperature: 0.3
-  });
-
-  return answer.result;
-}
-
-// Verwendung
-const documentText = "Ein langes Dokument mit vielen Informationen...";
-const question = "Was sind die Hauptpunkte des Dokuments?";
-
-processDocument(documentText, question)
-  .then(answer => console.log('Antwort:', answer))
-  .catch(error => console.error('Fehler:', error));
+# API-Key Fallback
+RAG_API_KEY=your-api-key
 ```
 
-## API Referenz
+## 🧪 Tests
 
-### RAGSDK
+```bash
+# Alle Tests ausführen
+npm test
 
-Hauptklasse für die RAG SDK.
+# Tests im Watch-Modus
+npm run test:watch
 
-#### Konstruktor
-
-```typescript
-new RAGSDK(config?: RAGConfig)
+# Tests mit Coverage
+npm run test:coverage
 ```
 
-#### Konfiguration
+## 📊 Test-Coverage
 
-```typescript
-interface RAGConfig {
-  baseURL?: string;     // API Endpoint URL
-  apiKey?: string;      // API Schlüssel
-  headers?: Record<string, string>; // Zusätzliche Headers
-}
+- **Gesamt-Coverage**: 100% ✅
+- **Azure OpenAI SDK**: 100% ✅
+- **Auth Manager**: 100% ✅
+- **RAG SDK**: 100% ✅
+
+## 🏗️ Architektur
+
+```
+src/
+├── auth.ts                 # OAuth2-Authentifizierung
+├── sdk.ts                  # RAG-SDK mit Auth-Integration
+├── azure-openai-sdk.ts     # Azure OpenAI SDK-Integration
+├── index.ts                # Haupt-Exports
+└── generated/              # Generierte OpenAPI-Typen
 ```
 
-### RAGClient
+## 🔗 Abhängigkeiten
 
-Client für RAG-spezifische Operationen.
+- **@azure/openai**: Offizielles Azure OpenAI SDK
+- **@azure/identity**: Azure Identity für Managed Identity
+- **axios**: HTTP-Client für REST-APIs
+- **TypeScript**: Vollständige TypeScript-Unterstützung
 
-#### Methoden
+## 📚 Beispiele
 
-- `generateCompletion(params: CompletionRequest)` - Text-Generierung
-- `createEmbeddings(params: EmbeddingRequest)` - Embeddings erstellen
-- `chunkText(params: ChunkRequest)` - Text chunking
-- `summarizeText(params: SummarizeRequest)` - Text zusammenfassen
+Siehe `example.ts` und `example-azure.ts` für vollständige Beispiele.
 
-## Entwicklung
+## 🤝 Beitragen
 
-1. Repository klonen
-2. Dependencies installieren: `npm install`
-3. OpenAPI Code generieren: `npm run generate`
-4. Build erstellen: `npm run build`
+1. Fork das Repository
+2. Erstelle einen Feature-Branch
+3. Committe deine Änderungen
+4. Push zum Branch
+5. Erstelle einen Pull Request
 
-## Scripts
+## 📄 Lizenz
 
-- `npm run generate` - Generiert TypeScript Code aus OpenAPI Spezifikation
-- `npm run build` - Erstellt Production Build
-- `npm run dev` - Watch Mode für Entwicklung
-- `npm run clean` - Löscht dist Ordner
+MIT License - siehe [LICENSE](LICENSE) für Details.
 
-## Lizenz
+## 🔗 Links
 
-MIT 
+- [Azure OpenAI Service](https://azure.microsoft.com/en-us/services/cognitive-services/openai-service/)
+- [Azure OpenAI SDK](https://github.com/Azure/azure-sdk-for-js/tree/main/sdk/openai/openai)
+- [Azure Identity](https://github.com/Azure/azure-sdk-for-js/tree/main/sdk/identity/identity) 

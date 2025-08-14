@@ -1,7 +1,7 @@
 {
   "name": "rag-sdk",
   "version": "1.0.0",
-  "description": "TypeScript/JavaScript SDK für Retrieval-Augmented Generation (RAG) Services",
+  "description": "TypeScript/JavaScript SDK für Retrieval-Augmented Generation (RAG) Services basierend auf Azure OpenAI",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
@@ -29,7 +29,10 @@
     "completion",
     "sdk",
     "typescript",
-    "javascript"
+    "javascript",
+    "azure",
+    "openai",
+    "microsoft"
   ],
   "author": "Your Name",
   "license": "MIT",
@@ -38,7 +41,9 @@
     "url": "https://github.com/yourusername/rag-sdk.git"
   },
   "dependencies": {
-    "axios": "^1.6.0"
+    "axios": "^1.6.0",
+    "@azure/openai": "^1.0.0-beta.12",
+    "@azure/identity": "^4.0.1"
   },
   "devDependencies": {
     "orval": "^6.15.0",
