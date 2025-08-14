@@ -9,6 +9,13 @@ import {
 } from '../src/index';
 
 describe('Index Exports', () => {
+  const mockConfig: RAGConfig = {
+    endpoint: 'https://test.openai.azure.com/',
+    apiKey: 'test-api-key',
+    deploymentName: 'gpt-4',
+    embeddingDeploymentName: 'text-embedding-ada-002'
+  };
+
   describe('Class Exports', () => {
     it('should export RAGClient class', () => {
       expect(RAGClient).toBeDefined();
@@ -21,13 +28,13 @@ describe('Index Exports', () => {
     });
 
     it('should be able to instantiate RAGClient from index', () => {
-      const client = new RAGClient();
+      const client = new RAGClient(mockConfig);
       expect(client).toBeInstanceOf(RAGClient);
     });
 
     it('should be able to instantiate RAGSDK from index', () => {
-      const sdk = new RAGSDK();
-      expect(sdk).toBeInstanceOf(RAGSDK);
+      const sdk = new RAGSDK(mockConfig);
+      expect(sdk.rag).toBeInstanceOf(RAGClient);
     });
   });
 
@@ -65,12 +72,14 @@ describe('Index Exports', () => {
 
     it('should export RAGConfig type', () => {
       const config: RAGConfig = {
-        baseURL: 'https://test.com',
+        endpoint: 'https://api.example.com',
         apiKey: 'test-key',
+        deploymentName: 'gpt-4',
         headers: { 'Custom-Header': 'value' }
       };
-      expect(config.baseURL).toBe('https://test.com');
+      expect(config.endpoint).toBe('https://api.example.com');
       expect(config.apiKey).toBe('test-key');
+      expect(config.deploymentName).toBe('gpt-4');
       expect(config.headers?.['Custom-Header']).toBe('value');
     });
 
@@ -87,14 +96,23 @@ describe('Index Exports', () => {
   describe('Generated Exports', () => {
     it('should export generated functions', () => {
       // Test that generated exports are available
-      // This tests the export * from './generated/default/default';
-      expect(true).toBe(true);
+      const { getDefault } = require('../src/generated/default/default');
+      expect(typeof getDefault).toBe('function');
+      
+      const api = getDefault();
+      expect(typeof api.completionCreate).toBe('function');
+      expect(typeof api.embeddingCreate).toBe('function');
+      expect(typeof api.chunkCreate).toBe('function');
+      expect(typeof api.summarizeCreate).toBe('function');
     });
 
     it('should export generated schemas', () => {
       // Test that generated schemas are available
-      // This tests the export * from './generated/schemas';
-      expect(true).toBe(true);
+      const schemas = require('../src/generated/schemas');
+      expect(schemas).toBeDefined();
+      // Die Schemas sind Interfaces, aber sie werden möglicherweise nicht korrekt exportiert
+      // Da sie von Orval generiert werden, testen wir nur, dass der Import funktioniert
+      expect(typeof schemas).toBe('object');
     });
   });
 }); 

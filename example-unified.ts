@@ -1,157 +1,101 @@
 import { RAGSDK } from './dist';
 
-// Vereinheitlichtes RAG SDK Beispiel
-async function unifiedRAGExample() {
-  console.log('🚀 Vereinheitlichtes RAG SDK Beispiel\n');
+// Vereinfachtes RAG SDK Beispiel
+async function simpleRAGExample() {
+  console.log('🚀 Vereinfachtes RAG SDK Beispiel\n');
   
-  // RAG SDK mit Username/Passwort + Azure OpenAI Backend
+  // RAG SDK - direkt über Azure OpenAI
   const rag = new RAGSDK({
-    // OAuth2-Authentifizierung
-    username: process.env.RAG_USERNAME || 'your-username',
-    password: process.env.RAG_PASSWORD || 'your-password',
-    authUrl: 'https://login.microsoftonline.com/your-tenant-id',
-    clientId: process.env.RAG_CLIENT_ID || 'your-client-id',
-    scope: 'openid profile email',
-    
-    // Azure OpenAI Backend (optional)
-    azureEndpoint: process.env.AZURE_OPENAI_ENDPOINT || 'https://your-resource.openai.azure.com/',
-    azureDeploymentName: process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-4',
-    azureEmbeddingDeploymentName: process.env.AZURE_OPENAI_EMBEDDING_DEPLOYMENT || 'text-embedding-ada-002',
-    
-    // Fallback zu eigener API
-    baseURL: 'https://your-rag-endpoint.com'
+    endpoint: process.env.AZURE_OPENAI_ENDPOINT || 'https://your-resource.openai.azure.com/',
+    apiKey: process.env.AZURE_OPENAI_API_KEY || 'your-azure-api-key'
+    // deploymentName, embeddingDeploymentName und apiVersion werden im Backend gesetzt
   });
 
   try {
-    // 1. Authentifizierung (holt Bearer-Token)
-    console.log('🔐 Authentifiziere...');
-    const token = await rag.authenticate();
-    console.log('✅ Authentifizierung erfolgreich!');
+    // 1. API-Calls - direkt über Azure OpenAI
+    console.log('🚀 Führe API-Calls aus...');
     
-    // Token-Status anzeigen
-    const status = rag.getTokenStatus();
-    console.log('📊 Token-Status:', status);
-
-    // 2. Prüfe Azure OpenAI Verfügbarkeit
-    console.log('\n🔍 Prüfe Azure OpenAI Verfügbarkeit...');
-    const isAzureAvailable = await rag.isAzureOpenAIAvailable();
-    console.log('✅ Azure OpenAI verfügbar:', isAzureAvailable);
-
-    // 3. API-Calls - SDK entscheidet automatisch zwischen Azure OpenAI und eigener API
-    console.log('\n🚀 Führe API-Calls aus...');
-    
-    // Text Completion (Azure OpenAI oder eigene API)
+    // Text Completion (direkt über Azure OpenAI)
     console.log('📝 Generiere Completion...');
     const completion = await rag.rag.generateCompletion({
       prompt: "Erkläre mir das Konzept von RAG (Retrieval-Augmented Generation) in einfachen Worten",
       max_tokens: 300,
       temperature: 0.7
-    });
-    console.log('✅ Completion:', completion.result);
-    if (completion.model) {
-      console.log('   Modell:', completion.model);
-    }
+    }) as any;
+    console.log('✅ Completion:', completion.choices[0]?.message?.content);
 
-    // Embeddings (Azure OpenAI oder eigene API)
+    // Embeddings (direkt über Azure OpenAI)
     console.log('\n🔢 Erstelle Embeddings...');
     const embedding = await rag.rag.createEmbeddings({
-      input: "Dies ist ein Beispieltext für Embeddings",
+      input: "Dies ist ein Beispieltext für Azure OpenAI Embeddings",
       model: "text-embedding-ada-002"
-    });
-    console.log('✅ Embedding erstellt');
-    if (embedding.model) {
-      console.log('   Modell:', embedding.model);
-    }
-    if (embedding.vector) {
-      console.log('   Vektor (erste 5 Werte):', embedding.vector.slice(0, 5));
-    }
+    }) as any;
+    console.log('✅ Embedding erstellt mit', embedding.data.length, 'Vektoren');
+    console.log('✅ Erster Vektor (erste 5 Werte):', embedding.data[0]?.embedding?.slice(0, 5));
 
-    // Text chunking (eigene API)
-    console.log('\n✂️ Chunking Text...');
-    const longText = `
-      Dies ist ein sehr langer Text, der in kleinere Stücke aufgeteilt werden soll. 
-      RAG (Retrieval-Augmented Generation) ist eine Technik, die es ermöglicht, 
-      Large Language Models mit externen Wissensquellen zu erweitern. 
-      Dabei werden relevante Dokumente oder Informationen aus einer Datenbank 
-      abgerufen und dem Modell als Kontext zur Verfügung gestellt.
-    `;
+    // 2. Direkter Zugriff auf Azure OpenAI Client
+    console.log('\n🔧 Verwende Azure OpenAI Client direkt...');
+    const azureClient = rag.rag.getAzureClient();
     
-    const chunks = await rag.rag.chunkText({
-      text: longText,
-      chunk_size: 100,
-      overlap: 20
-    });
-    console.log('✅ Anzahl Chunks:', chunks.total_chunks);
-    console.log('✅ Erster Chunk:', chunks.chunks?.[0]?.text);
-
-    // Text zusammenfassen (eigene API)
-    console.log('\n📋 Fasse Text zusammen...');
-    const summary = await rag.rag.summarizeText({
-      text: longText,
-      max_length: 100
-    });
-    console.log('✅ Summary:', summary.summary);
-
-    // 4. Azure OpenAI Client direkt verwenden (falls verfügbar)
-    if (isAzureAvailable) {
-      console.log('\n🔧 Verwende Azure OpenAI Client direkt...');
-      const azureClient = await rag.getAzureClient();
-      if (azureClient) {
-        console.log('✅ Azure OpenAI Client verfügbar');
-        
-        // Direkter Chat mit Azure OpenAI
-        try {
-          const chatResult = await azureClient.getChatCompletions(
-            process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-4',
-            [
-              { role: 'system', content: 'Du bist ein hilfreicher Assistent.' },
-              { role: 'user', content: 'Was ist der Unterschied zwischen RAG und normalen LLMs?' }
-            ],
-            { maxTokens: 200, temperature: 0.7 }
-          );
-          
-          console.log('✅ Direkter Azure OpenAI Chat:', chatResult.choices[0]?.message?.content);
-        } catch (error) {
-          console.warn('⚠️ Direkter Azure OpenAI Call fehlgeschlagen:', error);
+    // Chat Completion mit System-Message
+    const chatCompletion = await azureClient.generateChatCompletion({
+      messages: [
+        {
+          role: 'system',
+          content: 'Du bist ein hilfreicher Assistent, der RAG erklärt.'
+        },
+        {
+          role: 'user',
+          content: 'Was ist der Unterschied zwischen RAG und normalen LLMs?'
         }
-      }
-    }
+      ],
+      maxTokens: 200,
+      temperature: 0.7
+    });
+    console.log('✅ Chat Completion:', chatCompletion.choices[0]?.message?.content);
 
-    // 5. Token-Status nach den Calls
-    const finalStatus = rag.getTokenStatus();
-    console.log('\n📊 Finaler Token-Status:', finalStatus);
+    // 3. Deployment wechseln
+    console.log('\n🔄 Wechsle Deployment...');
+    azureClient.setDeployment('gpt-35-turbo');
+    console.log('✅ Deployment gewechselt zu gpt-35-turbo');
+
+    // 4. Neuer Chat mit anderem Deployment
+    console.log('\n💬 Chat mit neuem Deployment...');
+    const newChatCompletion = await azureClient.generateChatCompletion({
+      messages: [
+        {
+          role: 'user',
+          content: 'Erkläre RAG in einem Satz'
+        }
+      ],
+      maxTokens: 100
+    });
+    console.log('✅ Neue Chat Response:', newChatCompletion.choices[0]?.message?.content);
 
   } catch (error) {
     console.error('❌ Fehler:', error);
   }
 }
 
-// Beispiel ohne Azure OpenAI (nur eigene API)
-async function ownAPIExample() {
-  console.log('\n🔧 RAG SDK mit eigener API (ohne Azure OpenAI)\n');
-  
+// Beispiel mit Managed Identity (für Azure-Umgebungen)
+async function managedIdentityExample() {
+  console.log('\n🔐 Azure OpenAI mit Managed Identity Beispiel\n');
+
   const rag = new RAGSDK({
-    username: process.env.RAG_USERNAME || 'your-username',
-    password: process.env.RAG_PASSWORD || 'your-password',
-    authUrl: 'https://login.microsoftonline.com/your-tenant-id',
-    clientId: process.env.RAG_CLIENT_ID || 'your-client-id',
-    baseURL: 'https://your-rag-endpoint.com'
+    endpoint: process.env.AZURE_OPENAI_ENDPOINT || 'https://your-resource.openai.azure.com/',
+    useManagedIdentity: true,
+    deploymentName: 'gpt-4'
   });
 
   try {
-    await rag.authenticate();
-    console.log('✅ Authentifizierung erfolgreich');
+    console.log('🔐 Verwende Managed Identity...');
     
-    const isAzureAvailable = await rag.isAzureOpenAIAvailable();
-    console.log('✅ Azure OpenAI verfügbar:', isAzureAvailable);
-    
-    // Alle Calls gehen über eigene API
     const completion = await rag.rag.generateCompletion({
-      prompt: 'Einfacher Test ohne Azure OpenAI',
-      max_tokens: 100
-    });
-    console.log('✅ Completion über eigene API:', completion.result);
-    
+      prompt: 'Erkläre RAG mit Managed Identity',
+      max_tokens: 150
+    }) as any;
+    console.log('✅ Completion:', completion.choices[0]?.message?.content);
+
   } catch (error) {
     console.error('❌ Fehler:', error);
   }
@@ -159,20 +103,18 @@ async function ownAPIExample() {
 
 // Hauptfunktion
 async function main() {
-  console.log('🚀 Vereinheitlichtes RAG SDK - Alle Features in einem SDK!\n');
+  console.log('🚀 Vereinfachtes RAG SDK - Direkt über Azure OpenAI!\n');
   
-  // Beispiel 1: Mit Azure OpenAI Backend
-  await unifiedRAGExample();
+  await simpleRAGExample();
+  await managedIdentityExample();
   
-  // Beispiel 2: Nur eigene API
-  await ownAPIExample();
-  
-  console.log('\n✨ Alle Beispiele abgeschlossen!');
-  console.log('\n🎯 Das RAG SDK ist jetzt ein einheitlicher Proxy für:');
-  console.log('   - OAuth2-Authentifizierung (Username/Passwort)');
-  console.log('   - Azure OpenAI Backend (falls konfiguriert)');
-  console.log('   - Eigene RAG-API (Fallback)');
-  console.log('   - Automatische Token-Verwaltung');
+  console.log('\n✨ Beispiel abgeschlossen!');
+  console.log('\n🎯 Das RAG SDK ist jetzt super einfach:');
+  console.log('   - Endpoint + API-Key + Deployment');
+  console.log('   - Direkte Kommunikation mit Azure OpenAI');
+  console.log('   - Keine HTTP-Proxy-Layer');
+  console.log('   - Vollständige Azure OpenAI Kompatibilität');
+  console.log('   - Optionale RAG-Features über dein Backend');
 }
 
 // Beispiel ausführen

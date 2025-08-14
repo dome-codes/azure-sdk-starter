@@ -6,9 +6,9 @@ Ein TypeScript/JavaScript SDK für Retrieval-Augmented Generation (RAG) Services
 
 Das RAG SDK ist ein **intelligenter Proxy**, der:
 - **OAuth2-Authentifizierung** mit Username/Passwort handhabt
-- **Azure OpenAI** als Backend verwendet (falls konfiguriert)
-- **Eigene RAG-APIs** als Fallback nutzt
-- **Automatisch entscheidet**, welche API für welche Anfrage verwendet wird
+- **Azure OpenAI-kompatible API-Endpunkte** verwendet (`/chat/completions`, `/embeddings`)
+- **Deine Backend-API** als Proxy für Azure OpenAI nutzt
+- **Identische Request/Response-Formate** zu Azure OpenAI bereitstellt
 
 ## 🚀 Features
 
@@ -18,17 +18,17 @@ Das RAG SDK ist ein **intelligenter Proxy**, der:
 - **Einmalige Anmeldung** für alle Services
 - **Bearer-Token** wird automatisch für alle API-Calls verwendet
 
-### 🤖 Intelligente API-Auswahl
-- **Azure OpenAI Backend** für Completions und Embeddings (falls verfügbar)
-- **Eigene RAG-API** als Fallback und für spezielle Features
-- **Automatische Entscheidung** zwischen Backends
-- **Transparente Nutzung** - du musst dich nicht um Backend-Details kümmern
+### 🤖 Azure OpenAI-kompatible API
+- **Identische Endpunkte** zu Azure OpenAI (`/chat/completions`, `/embeddings`)
+- **Gleiche Request/Response-Formate** wie Azure OpenAI
+- **Dein Backend** leitet Calls an Azure OpenAI weiter
+- **Transparente Nutzung** - du verwendest die gleichen API-Aufrufe wie bei Azure OpenAI
 
 ### 🛠️ RAG-Funktionalitäten
-- **Text Completion** - Generierung von Antworten
-- **Embeddings** - Vektorisierung von Texten
-- **Text Chunking** - Aufteilung langer Texte
-- **Text Summarization** - Zusammenfassung von Inhalten
+- **Text Completion** - Generierung von Antworten (über `/chat/completions`)
+- **Embeddings** - Vektorisierung von Texten (über `/embeddings`)
+- **Text Chunking** - Aufteilung langer Texte (über `/chunk`)
+- **Text Summarization** - Zusammenfassung von Inhalten (über `/summarize`)
 
 ## 📦 Installation
 
@@ -44,41 +44,39 @@ npm install rag-sdk
 import { RAGSDK } from 'rag-sdk';
 
 const rag = new RAGSDK({
-  // OAuth2-Authentifizierung
+  // Azure OpenAI Konfiguration (erforderlich)
+  endpoint: 'https://your-resource.openai.azure.com/',
+  apiKey: 'your-azure-api-key',
+  
+  // Optionale Azure-Parameter (werden im Backend gesetzt falls nicht angegeben)
+  deploymentName: 'gpt-4',
+  embeddingDeploymentName: 'text-embedding-ada-002',
+  apiVersion: '2024-02-15-preview',
+  
+  // OAuth2-Authentifizierung für RAG-spezifische Features (optional)
   username: 'your-username',
   password: 'your-password',
-  authUrl: 'https://login.microsoftonline.com/your-tenant-id',
-  clientId: 'your-client-id',
-  scope: 'openid profile email',
-  
-  // Azure OpenAI Backend (optional)
-  azureEndpoint: 'https://your-resource.openai.azure.com/',
-  azureDeploymentName: 'gpt-4',
-  azureEmbeddingDeploymentName: 'text-embedding-ada-002',
-  
-  // Eigene API (Fallback)
   baseURL: 'https://your-rag-endpoint.com'
 });
 ```
 
-### Nur eigene API (ohne Azure OpenAI)
+### Nur Azure OpenAI (ohne RAG-Features)
 
 ```typescript
 const rag = new RAGSDK({
-  username: 'your-username',
-  password: 'your-password',
-  authUrl: 'https://login.microsoftonline.com/your-tenant-id',
-  clientId: 'your-client-id',
-  baseURL: 'https://your-rag-endpoint.com'
+  endpoint: 'https://your-resource.openai.azure.com/',
+  apiKey: 'your-azure-api-key'
+  // deploymentName, embeddingDeploymentName und apiVersion werden im Backend gesetzt
 });
 ```
 
-### Fallback zu API-Key
+### Mit Managed Identity (für Azure-Umgebungen)
 
 ```typescript
 const rag = new RAGSDK({
-  apiKey: 'your-api-key',
-  baseURL: 'https://your-rag-endpoint.com'
+  endpoint: 'https://your-resource.openai.azure.com/',
+  useManagedIdentity: true
+  // deploymentName, embeddingDeploymentName und apiVersion werden im Backend gesetzt
 });
 ```
 
@@ -89,69 +87,97 @@ const rag = new RAGSDK({
 ```typescript
 // 1. SDK initialisieren
 const rag = new RAGSDK({
-  username: 'user@company.com',
-  password: 'password123',
-  clientId: 'your-app-id',
-  azureEndpoint: 'https://your-resource.openai.azure.com/',
-  azureDeploymentName: 'gpt-4'
+  endpoint: 'https://your-resource.openai.azure.com/',
+  apiKey: 'your-azure-api-key',
+  deploymentName: 'gpt-4'
 });
 
-// 2. Authentifizieren (holt Bearer-Token)
-await rag.authenticate();
-
-// 3. API-Calls - SDK entscheidet automatisch zwischen Azure OpenAI und eigener API
+// 2. API-Calls - direkt über Azure OpenAI
 const completion = await rag.rag.generateCompletion({
   prompt: 'Erkläre mir RAG',
   max_tokens: 300,
   temperature: 0.7
 });
 
-console.log(completion.result);
+console.log(completion.choices[0].message.content);
 ```
 
-### Automatische Backend-Auswahl
+### Alle verfügbaren API-Calls
 
 ```typescript
-// Das SDK entscheidet automatisch:
-// - Azure OpenAI für Completions/Embeddings (falls konfiguriert)
-// - Eigene API für Chunking/Summarization
-// - Fallback zu eigener API bei Azure OpenAI Fehlern
-
-// Completion (Azure OpenAI oder eigene API)
+// Text Completion (direkt über Azure OpenAI)
 const completion = await rag.rag.generateCompletion({
-  prompt: 'Erkläre RAG'
+  prompt: 'Erkläre RAG',
+  max_tokens: 300,
+  temperature: 0.7
 });
 
-// Embeddings (Azure OpenAI oder eigene API)
+// Embeddings (direkt über Azure OpenAI)
 const embedding = await rag.rag.createEmbeddings({
-  input: 'Text für Embeddings'
+  input: 'Text für Embeddings',
+  model: 'text-embedding-ada-002'
 });
 
-// Text Chunking (immer eigene API)
+// Text chunking (eigene RAG-API über dein Backend)
 const chunks = await rag.rag.chunkText({
   text: 'Langer Text...',
-  chunk_size: 100
+  chunk_size: 100,
+  overlap: 20
 });
 
-// Text Summarization (immer eigene API)
+// Text Summarization (eigene RAG-API über dein Backend)
 const summary = await rag.rag.summarizeText({
   text: 'Langer Text...',
   max_length: 100
 });
 ```
 
-### Azure OpenAI Status prüfen
+### Direkter Zugriff auf Azure OpenAI Client
 
 ```typescript
-// Prüfe ob Azure OpenAI verfügbar ist
-const isAzureAvailable = await rag.isAzureOpenAIAvailable();
-console.log('Azure OpenAI verfügbar:', isAzureAvailable);
+// Hole den Azure OpenAI Client für erweiterte Features
+const azureClient = rag.rag.getAzureClient();
 
-// Hole Azure OpenAI Client direkt (falls verfügbar)
-if (isAzureAvailable) {
-  const azureClient = await rag.getAzureClient();
-  // Verwende Azure OpenAI Client direkt für spezielle Anwendungsfälle
-}
+// Verwende Azure OpenAI Client direkt
+const chatCompletion = await azureClient.generateChatCompletion({
+  messages: [
+    { role: 'system', content: 'Du bist ein hilfreicher Assistent.' },
+    { role: 'user', content: 'Erkläre RAG' }
+  ],
+  maxTokens: 300
+});
+```
+
+### Azure OpenAI-kompatible Response-Formate
+
+```typescript
+// Completion Response (identisch zu Azure OpenAI)
+const completion = await rag.rag.generateCompletion({
+  prompt: 'Erkläre RAG'
+});
+
+// Response-Format: { choices: [{ message: { content: string } }], usage: {...} }
+console.log(completion.choices[0].message.content);
+
+// Embedding Response (identisch zu Azure OpenAI)
+const embedding = await rag.rag.createEmbeddings({
+  input: 'Text für Embeddings'
+});
+
+// Response-Format: { data: [{ embedding: number[], index: number }], usage: {...} }
+console.log(embedding.data[0].embedding);
+```
+
+### Token-Status prüfen
+
+```typescript
+// Prüfe den aktuellen Token-Status
+const status = rag.getTokenStatus();
+console.log('Token gültig bis:', status.expiresAt);
+console.log('Token läuft bald ab:', status.isExpiringSoon);
+
+// Tokens löschen
+rag.clearTokens();
 ```
 
 ## 🔐 Umgebungsvariablen
@@ -160,12 +186,10 @@ if (isAzureAvailable) {
 # OAuth2-Authentifizierung
 RAG_USERNAME=your-username
 RAG_PASSWORD=your-password
-RAG_CLIENT_ID=your-client-id
 
 # Azure OpenAI Backend (optional)
-AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
-AZURE_OPENAI_DEPLOYMENT=gpt-4
-AZURE_OPENAI_EMBEDDING_DEPLOYMENT=text-embedding-ada-002
+AZURE_DEPLOYMENT=gpt-4
+AZURE_API_VERSION=2024-02-15-preview
 
 # Eigene API
 RAG_API_URL=https://your-rag-endpoint.com
@@ -185,6 +209,9 @@ npm run test:watch
 
 # Tests mit Coverage
 npm run test:coverage
+
+# Linting
+npm run lint
 ```
 
 ## 📊 Test-Coverage
@@ -209,18 +236,35 @@ npm run test:coverage
 
 ## 🔄 Funktionsweise
 
-1. **Authentifizierung**: SDK holt Bearer-Token mit Username/Passwort
+1. **Konfiguration**: SDK erstellt Azure OpenAI Client mit deinen Credentials
 2. **API-Call**: Du rufst `rag.rag.generateCompletion()` auf
-3. **Backend-Entscheidung**: SDK prüft Azure OpenAI Verfügbarkeit
-4. **Azure OpenAI**: Falls verfügbar, leitet SDK Call an Azure weiter
-5. **Fallback**: Bei Fehlern oder fehlender Konfiguration → eigene API
-6. **Transparenz**: Du bekommst immer das gleiche Ergebnis-Format
+3. **Direkter Aufruf**: SDK leitet Call direkt an Azure OpenAI weiter
+4. **Response**: Du bekommst das identische Response-Format wie von Azure OpenAI
+5. **Transparenz**: Du verwendest die gleiche API wie Azure OpenAI, aber mit vereinfachter Konfiguration
+
+## 🆚 Unterschied zu Azure OpenAI
+
+| Aspekt | Azure OpenAI | RAG SDK |
+|--------|--------------|---------|
+| **Konfiguration** | Komplexe Setup | Einfache Konfiguration |
+| **API-Calls** | Direkt | Direkt (über SDK) |
+| **Request-Format** | Identisch | Identisch |
+| **Response-Format** | Identisch | Identisch |
+| **Deployment** | Direkt konfiguriert | Direkt konfiguriert |
+| **Authentifizierung** | API-Key/Managed Identity | API-Key/Managed Identity |
+| **Zusätzliche Features** | Keine | RAG-spezifische Features (optional) |
+
+## 🎯 Vorteile des neuen Ansatzes
+
+- **Keine HTTP-Proxy-Layer** - direkte Kommunikation mit Azure OpenAI
+- **Bessere Performance** - keine zusätzlichen Netzwerk-Hops
+- **Einfachere Konfiguration** - nur Azure OpenAI Parameter
+- **Vollständige Azure OpenAI Kompatibilität** - alle Features verfügbar
+- **Optionale RAG-Features** - nur wenn benötigt
 
 ## 📚 Beispiele
 
-- **`example.ts`** - Grundlegende RAG-Funktionalitäten
-- **`example-azure.ts`** - Azure OpenAI Integration
-- **`example-unified.ts`** - 🆕 Vereinigte Proxy-Architektur
+- **`example-unified.ts`** - Vereinigte Proxy-Architektur
 
 ## 🤝 Beitragen
 

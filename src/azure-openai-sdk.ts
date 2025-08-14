@@ -1,5 +1,5 @@
-import { OpenAIClient, AzureKeyCredential, ChatCompletions, ChatCompletionsOptions, EmbeddingsOptions, Embeddings } from '@azure/openai';
-import { DefaultAzureCredential, TokenCredential } from '@azure/identity';
+import { DefaultAzureCredential } from '@azure/identity';
+import { AzureKeyCredential, ChatCompletions, Embeddings, GetChatCompletionsOptions, GetEmbeddingsOptions, OpenAIClient } from '@azure/openai';
 
 export interface AzureOpenAIConfig {
   endpoint: string;
@@ -68,15 +68,14 @@ export class AzureOpenAIClient {
    */
   async generateChatCompletion(request: ChatCompletionRequest): Promise<ChatCompletions> {
     try {
-      const options: ChatCompletionsOptions = {
-        maxTokens: request.maxTokens,
-        temperature: request.temperature,
-        topP: request.topP,
-        frequencyPenalty: request.frequencyPenalty,
-        presencePenalty: request.presencePenalty,
-        stop: request.stop,
-        stream: request.stream || false
-      };
+      const options: GetChatCompletionsOptions = {};
+      
+      if (request.maxTokens !== undefined) options.maxTokens = request.maxTokens;
+      if (request.temperature !== undefined) options.temperature = request.temperature;
+      if (request.topP !== undefined) options.topP = request.topP;
+      if (request.frequencyPenalty !== undefined) options.frequencyPenalty = request.frequencyPenalty;
+      if (request.presencePenalty !== undefined) options.presencePenalty = request.presencePenalty;
+      if (request.stop !== undefined) options.stop = request.stop;
 
       const result = await this.client.getChatCompletions(
         this.deploymentName,
@@ -86,29 +85,32 @@ export class AzureOpenAIClient {
 
       return result;
     } catch (error) {
-      throw new Error(`Chat completion generation failed: ${error}`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new Error(`Chat completion generation failed: ${errorMessage}`);
     }
   }
 
   /**
    * Generiert Text-Completions (für ältere Modelle)
    */
-  async generateCompletion(request: CompletionRequest): Promise<any> {
+  async generateCompletion(request: CompletionRequest): Promise<ChatCompletions> {
     try {
       // Für Text-Completions verwenden wir Chat-Completions mit einem einzelnen User-Message
       const chatRequest: ChatCompletionRequest = {
-        messages: [{ role: 'user', content: request.prompt }],
-        maxTokens: request.maxTokens,
-        temperature: request.temperature,
-        topP: request.topP,
-        frequencyPenalty: request.frequencyPenalty,
-        presencePenalty: request.presencePenalty,
-        stop: request.stop
+        messages: [{ role: 'user', content: request.prompt }]
       };
+      
+      if (request.maxTokens !== undefined) chatRequest.maxTokens = request.maxTokens;
+      if (request.temperature !== undefined) chatRequest.temperature = request.temperature;
+      if (request.topP !== undefined) chatRequest.topP = request.topP;
+      if (request.frequencyPenalty !== undefined) chatRequest.frequencyPenalty = request.frequencyPenalty;
+      if (request.presencePenalty !== undefined) chatRequest.presencePenalty = request.presencePenalty;
+      if (request.stop !== undefined) chatRequest.stop = request.stop;
 
       return this.generateChatCompletion(chatRequest);
     } catch (error) {
-      throw new Error(`Text completion generation failed: ${error}`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new Error(`Text completion generation failed: ${errorMessage}`);
     }
   }
 
@@ -117,19 +119,22 @@ export class AzureOpenAIClient {
    */
   async createEmbeddings(request: EmbeddingRequest): Promise<Embeddings> {
     try {
-      const options: EmbeddingsOptions = {
+      const options: GetEmbeddingsOptions = {
         model: request.model || this.embeddingDeploymentName
       };
 
+      const inputArray = Array.isArray(request.input) ? request.input : [request.input];
+
       const result = await this.client.getEmbeddings(
         this.embeddingDeploymentName,
-        request.input,
+        inputArray,
         options
       );
 
       return result;
     } catch (error) {
-      throw new Error(`Embedding creation failed: ${error}`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new Error(`Embedding creation failed: ${errorMessage}`);
     }
   }
 
@@ -179,7 +184,7 @@ export class AzureOpenAISDK {
   /**
    * Generiert eine Text-Completion
    */
-  async completion(request: CompletionRequest): Promise<any> {
+  async completion(request: CompletionRequest): Promise<ChatCompletions> {
     return this.openai.generateCompletion(request);
   }
 

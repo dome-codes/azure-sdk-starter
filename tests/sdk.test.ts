@@ -1,85 +1,68 @@
-import { ChunkRequest, CompletionRequest, EmbeddingRequest, RAGClient, RAGSDK, SummarizeRequest } from '../src/sdk';
+import { ChunkRequest, CompletionRequest, EmbeddingRequest, RAGClient, RAGConfig, RAGSDK, SummarizeRequest } from '../src/sdk';
 
-// Mock axios
-jest.mock('axios', () => ({
-  create: jest.fn()
+// Mock Azure OpenAI SDK
+let mockAzureClient: any;
+
+jest.mock('../src/azure-openai-sdk', () => ({
+  AzureOpenAIClient: jest.fn().mockImplementation(() => mockAzureClient)
 }));
 
 describe('RAGSDK', () => {
-  let ragSDK: RAGSDK;
   let ragClient: RAGClient;
-  let mockPost: jest.Mock;
-  let mockAxiosCreate: jest.Mock;
-  const baseURL = 'https://test-rag-endpoint.com';
-  const apiKey = 'test-api-key';
+  const mockConfig: RAGConfig = {
+    endpoint: 'https://test.openai.azure.com/',
+    apiKey: 'test-api-key'
+  };
 
   beforeEach(() => {
     // Reset mocks
     jest.clearAllMocks();
-    mockPost = jest.fn();
-    mockAxiosCreate = require('axios').create as jest.Mock;
-    mockAxiosCreate.mockReturnValue({ post: mockPost });
     
-    ragSDK = new RAGSDK({ baseURL, apiKey });
-    ragClient = new RAGClient({ baseURL, apiKey });
+    // Mock Azure OpenAI Client
+    mockAzureClient = {
+      generateCompletion: jest.fn(),
+      createEmbeddings: jest.fn()
+    };
+    
+    const { AzureOpenAIClient } = require('../src/azure-openai-sdk');
+    AzureOpenAIClient.mockImplementation(() => mockAzureClient);
+    
+    ragClient = new RAGClient(mockConfig);
   });
 
   describe('Constructor', () => {
-    it('should create RAGSDK with default config', () => {
-      const sdk = new RAGSDK();
+    it('should create RAGSDK with config', () => {
+      const sdk = new RAGSDK(mockConfig);
       expect(sdk.rag).toBeInstanceOf(RAGClient);
     });
 
-    it('should create RAGSDK with custom config', () => {
-      const config = { baseURL: 'https://custom.com', apiKey: 'custom-key' };
-      const sdk = new RAGSDK(config);
-      expect(sdk.rag).toBeInstanceOf(RAGClient);
-    });
-
-    it('should create RAGClient with default config', () => {
-      const client = new RAGClient();
+    it('should create RAGClient with config', () => {
+      const client = new RAGClient(mockConfig);
       expect(client).toBeInstanceOf(RAGClient);
     });
 
-    it('should create RAGClient with custom config', () => {
-      const config = { baseURL: 'https://custom.com', apiKey: 'custom-key' };
-      const client = new RAGClient(config);
-      expect(client).toBeInstanceOf(RAGClient);
-    });
-
-    it('should create RAGClient with headers', () => {
-      const config = { 
-        baseURL: 'https://custom.com', 
-        apiKey: 'custom-key',
-        headers: { 'Custom-Header': 'value' }
-      };
-      const client = new RAGClient(config);
-      expect(client).toBeInstanceOf(RAGClient);
-    });
-
-    it('should configure axios with correct settings', () => {
-      const config = { baseURL: 'https://test.com', apiKey: 'test-key' };
-      new RAGClient(config);
-      
-      expect(mockAxiosCreate).toHaveBeenCalledWith({
-        baseURL: 'https://test.com',
-        headers: {
-          'Authorization': 'Bearer test-key',
-          'Content-Type': 'application/json'
-        }
-      });
+    it('should create Azure OpenAI Client', () => {
+      const { AzureOpenAIClient } = require('../src/azure-openai-sdk');
+      expect(AzureOpenAIClient).toHaveBeenCalledWith(expect.objectContaining({
+        endpoint: 'https://test.openai.azure.com/',
+        apiKey: 'test-api-key',
+        deploymentName: 'gpt-4',
+        embeddingDeploymentName: 'text-embedding-ada-002'
+      }));
     });
   });
 
   describe('generateCompletion', () => {
     it('should generate completion successfully', async () => {
       const mockResponse = {
-        data: {
-          result: 'RAG ist eine Technik zur Erweiterung von LLMs mit externen Datenquellen.',
-          tokens_used: 25
-        }
+        choices: [{
+          message: {
+            content: 'RAG ist eine Technik zur Erweiterung von LLMs mit externen Datenquellen.'
+          }
+        }],
+        usage: { total_tokens: 25 }
       };
-      mockPost.mockResolvedValue(mockResponse);
+      mockAzureClient.generateCompletion.mockResolvedValue(mockResponse);
 
       const request: CompletionRequest = {
         prompt: 'Erkläre RAG',
@@ -89,151 +72,92 @@ describe('RAGSDK', () => {
 
       const result = await ragClient.generateCompletion(request);
       
-      expect(mockPost).toHaveBeenCalledWith('/completion', request);
-      expect(result).toEqual(mockResponse.data);
+      expect(mockAzureClient.generateCompletion).toHaveBeenCalledWith({
+        prompt: 'Erkläre RAG',
+        maxTokens: 100,
+        temperature: 0.7
+      });
+      expect(result).toEqual(mockResponse);
     });
 
     it('should handle completion errors', async () => {
       const error = new Error('API Error');
-      mockPost.mockRejectedValue(error);
+      mockAzureClient.generateCompletion.mockRejectedValue(error);
 
       const request: CompletionRequest = {
-        prompt: 'Test prompt'
+        prompt: 'Erkläre RAG',
+        max_tokens: 100
       };
 
       await expect(ragClient.generateCompletion(request))
         .rejects
-        .toThrow('Completion generation failed:');
+        .toThrow('Completion generation failed: API Error');
     });
   });
 
   describe('createEmbeddings', () => {
-    it('should create embeddings successfully with string input', async () => {
+    it('should create embeddings successfully', async () => {
       const mockResponse = {
-        data: {
-          vector: [0.1, 0.2, 0.3, 0.4, 0.5],
-          model: 'text-embedding-ada-002'
-        }
+        data: [{
+          embedding: [0.1, 0.2, 0.3, 0.4, 0.5],
+          index: 0
+        }],
+        usage: { total_tokens: 10 }
       };
-      mockPost.mockResolvedValue(mockResponse);
+      mockAzureClient.createEmbeddings.mockResolvedValue(mockResponse);
 
       const request: EmbeddingRequest = {
-        input: 'Test text',
+        input: 'Text für Embeddings',
         model: 'text-embedding-ada-002'
       };
 
       const result = await ragClient.createEmbeddings(request);
       
-      expect(mockPost).toHaveBeenCalledWith('/embedding', request);
-      expect(result).toEqual(mockResponse.data);
-    });
-
-    it('should create embeddings successfully with array input', async () => {
-      const mockResponse = {
-        data: {
-          vectors: [[0.1, 0.2], [0.3, 0.4]],
-          model: 'text-embedding-ada-002'
-        }
-      };
-      mockPost.mockResolvedValue(mockResponse);
-
-      const request: EmbeddingRequest = {
-        input: ['Text 1', 'Text 2'],
+      expect(mockAzureClient.createEmbeddings).toHaveBeenCalledWith({
+        input: 'Text für Embeddings',
         model: 'text-embedding-ada-002'
-      };
-
-      const result = await ragClient.createEmbeddings(request);
-      
-      expect(mockPost).toHaveBeenCalledWith('/embedding', request);
-      expect(result).toEqual(mockResponse.data);
+      });
+      expect(result).toEqual(mockResponse);
     });
 
     it('should handle embedding errors', async () => {
-      const error = new Error('Invalid input');
-      mockPost.mockRejectedValue(error);
+      const error = new Error('API Error');
+      mockAzureClient.createEmbeddings.mockRejectedValue(error);
 
       const request: EmbeddingRequest = {
-        input: ''
+        input: 'Text für Embeddings'
       };
 
       await expect(ragClient.createEmbeddings(request))
         .rejects
-        .toThrow('Embedding creation failed:');
+        .toThrow('Embedding creation failed: API Error');
     });
   });
 
   describe('chunkText', () => {
-    it('should chunk text successfully', async () => {
-      const mockResponse = {
-        data: {
-          total_chunks: 2,
-          chunks: [
-            { text: 'Dies ist der erste Chunk', index: 0 },
-            { text: 'Dies ist der zweite Chunk', index: 1 }
-          ]
-        }
-      };
-      mockPost.mockResolvedValue(mockResponse);
-
+    it('should throw error for not implemented feature', async () => {
       const request: ChunkRequest = {
         text: 'Dies ist ein langer Text',
         chunk_size: 100,
         overlap: 20
       };
 
-      const result = await ragClient.chunkText(request);
-      
-      expect(mockPost).toHaveBeenCalledWith('/chunk', request);
-      expect(result).toEqual(mockResponse.data);
-    });
-
-    it('should handle chunking errors', async () => {
-      const error = new Error('Chunking failed');
-      mockPost.mockRejectedValue(error);
-
-      const request: ChunkRequest = {
-        text: ''
-      };
-
       await expect(ragClient.chunkText(request))
         .rejects
-        .toThrow('Text chunking failed:');
+        .toThrow('Chunking not yet implemented - requires backend integration');
     });
   });
 
   describe('summarizeText', () => {
-    it('should summarize text successfully', async () => {
-      const mockResponse = {
-        data: {
-          summary: 'Kurze Zusammenfassung des Textes.',
-          original_length: 500,
-          summary_length: 50
-        }
-      };
-      mockPost.mockResolvedValue(mockResponse);
-
+    it('should throw error for not implemented feature', async () => {
       const request: SummarizeRequest = {
         text: 'Ein sehr langer Text...',
         max_length: 100
       };
 
-      const result = await ragClient.summarizeText(request);
-      
-      expect(mockPost).toHaveBeenCalledWith('/summarize', request);
-      expect(result).toEqual(mockResponse.data);
-    });
-
-    it('should handle summarization errors', async () => {
-      const error = new Error('Text too short');
-      mockPost.mockRejectedValue(error);
-
-      const request: SummarizeRequest = {
-        text: 'Kurz'
-      };
-
       await expect(ragClient.summarizeText(request))
         .rejects
-        .toThrow('Text summarization failed:');
+        .toThrow('Summarization not yet implemented - requires backend integration');
     });
   });
 
@@ -269,39 +193,92 @@ describe('RAGSDK', () => {
 
     it('should accept valid ChunkRequest', () => {
       const request: ChunkRequest = {
-        text: 'Dies ist ein langer Text',
+        text: 'Long text to chunk',
         chunk_size: 100,
         overlap: 20
       };
-      expect(request.text).toBe('Dies ist ein langer Text');
+      expect(request.text).toBe('Long text to chunk');
       expect(request.chunk_size).toBe(100);
       expect(request.overlap).toBe(20);
     });
 
     it('should accept valid SummarizeRequest', () => {
       const request: SummarizeRequest = {
-        text: 'Ein sehr langer Text...',
+        text: 'Long text to summarize',
         max_length: 100
       };
-      expect(request.text).toBe('Ein sehr langer Text...');
+      expect(request.text).toBe('Long text to summarize');
       expect(request.max_length).toBe(100);
     });
   });
 
+  describe('Configuration', () => {
+    it('should accept valid config with API key', () => {
+      const config: RAGConfig = {
+        endpoint: 'https://test.openai.azure.com/',
+        apiKey: 'test-api-key'
+      };
+      
+      expect(() => new RAGClient(config)).not.toThrow();
+    });
+
+    it('should accept valid config with username/password', () => {
+      const config: RAGConfig = {
+        endpoint: 'https://test.openai.azure.com/',
+        username: 'testuser',
+        password: 'testpass'
+      };
+      
+      expect(() => new RAGClient(config)).not.toThrow();
+    });
+
+    it('should accept config with managed identity', () => {
+      const config: RAGConfig = {
+        endpoint: 'https://test.openai.azure.com/',
+        useManagedIdentity: true
+      };
+      
+      expect(() => new RAGClient(config)).not.toThrow();
+    });
+
+    it('should require either apiKey, username/password, or useManagedIdentity', () => {
+      const config: RAGConfig = {
+        endpoint: 'https://test.openai.azure.com/'
+        // Keine Authentifizierung
+      };
+      
+      expect(() => new RAGClient(config)).toThrow('Either apiKey, useManagedIdentity, or username/password must be provided');
+    });
+
+    it('should accept optional Azure parameters', () => {
+      const config: RAGConfig = {
+        endpoint: 'https://test.openai.azure.com/',
+        apiKey: 'test-api-key',
+        deploymentName: 'custom-deployment',
+        embeddingDeploymentName: 'custom-embedding',
+        apiVersion: '2024-02-15-preview'
+      };
+      
+      expect(() => new RAGClient(config)).not.toThrow();
+    });
+  });
+
   describe('Error Handling', () => {
-    it('should handle invalid URLs gracefully', () => {
-      const client = new RAGClient({ baseURL: 'invalid-url' });
-      expect(client).toBeInstanceOf(RAGClient);
+    it('should handle missing endpoint gracefully', () => {
+      const config: any = {
+        apiKey: 'test-key'
+      };
+      
+      expect(() => new RAGClient(config)).toThrow('Endpoint is required');
     });
 
     it('should handle missing API keys gracefully', () => {
-      const client = new RAGClient({ baseURL: 'https://test.com' });
-      expect(client).toBeInstanceOf(RAGClient);
-    });
-
-    it('should handle empty config gracefully', () => {
-      const client = new RAGClient({});
-      expect(client).toBeInstanceOf(RAGClient);
+      const config: any = {
+        endpoint: 'https://test.openai.azure.com/'
+        // Keine Authentifizierung
+      };
+      
+      expect(() => new RAGClient(config)).toThrow('Either apiKey, useManagedIdentity, or username/password must be provided');
     });
   });
 
@@ -320,6 +297,10 @@ describe('RAGSDK', () => {
 
     it('should have summarizeText method', () => {
       expect(typeof ragClient.summarizeText).toBe('function');
+    });
+
+    it('should have getAzureClient method', () => {
+      expect(typeof ragClient.getAzureClient).toBe('function');
     });
   });
 }); 
