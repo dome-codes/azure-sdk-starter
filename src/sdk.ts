@@ -47,6 +47,14 @@ export interface RAGConfig {
   
   // Fallback für direkte API-Key-Nutzung
   headers?: Record<string, string>;
+  
+  // SSL/TLS Konfiguration (optional)
+  sslOptions?: {
+    rejectUnauthorized?: boolean;      // SSL-Zertifikat-Validierung (Standard: true)
+    ca?: string | Buffer;             // Custom CA-Zertifikat
+    cert?: string | Buffer;           // Client-Zertifikat
+    key?: string | Buffer;            // Client-Schlüssel
+  };
 }
 
 export class RAGClient {
@@ -64,6 +72,19 @@ export class RAGClient {
       deploymentName: config.deploymentName || 'gpt-4',
       embeddingDeploymentName: config.embeddingDeploymentName || 'text-embedding-ada-002'
     };
+    
+    // SSL/TLS Konfiguration anwenden
+    if (config.sslOptions) {
+      // SSL-Optionen für Node.js https-Agent
+      if (config.sslOptions.rejectUnauthorized !== undefined) {
+        process.env.NODE_TLS_REJECT_UNAUTHORIZED = config.sslOptions.rejectUnauthorized ? '1' : '0';
+      }
+      
+      // Weitere SSL-Optionen können hier hinzugefügt werden
+      if (config.sslOptions.ca) azureConfig.ca = config.sslOptions.ca;
+      if (config.sslOptions.cert) azureConfig.cert = config.sslOptions.cert;
+      if (config.sslOptions.key) azureConfig.key = config.sslOptions.key;
+    }
     
     // Authentifizierung: entweder API Key ODER Managed Identity ODER Username/Password
     if (config.apiKey) {

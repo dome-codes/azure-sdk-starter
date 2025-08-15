@@ -7,8 +7,13 @@ async function simpleRAGExample() {
   // RAG SDK - direkt über Azure OpenAI
   const rag = new RAGSDK({
     endpoint: process.env.AZURE_OPENAI_ENDPOINT || 'https://your-resource.openai.azure.com/',
-    apiKey: process.env.AZURE_OPENAI_API_KEY || 'your-azure-api-key'
+    apiKey: process.env.AZURE_OPENAI_API_KEY || 'your-azure-api-key',
     // deploymentName, embeddingDeploymentName und apiVersion werden im Backend gesetzt
+    
+    // SSL-Konfiguration für Entwicklung (Zertifikat-Validierung deaktivieren)
+    sslOptions: {
+      rejectUnauthorized: false  // Nur für Entwicklung/Tests verwenden!
+    }
   });
 
   try {
