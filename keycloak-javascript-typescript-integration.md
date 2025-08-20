@@ -148,8 +148,8 @@ class ApiClient {
         this.baseUrl = 'https://api.example.com';
     }
 
-    async getCompletions(messages, version = 'v1', model = 'gpt-4', options = {}) {
-        const url = `${this.baseUrl}/${version}/completions?api-version=2024-01-01&model=${model}`;
+    async getCompletions(messages, apiVersion = '2024-12-01', model = 'gpt-4o', options = {}) {
+        const url = `${this.baseUrl}/v1/completions?api-version=${apiVersion}&model=${model}`;
         const requestBody = {
             messages: messages,
             max_tokens: options.maxTokens || 100,
@@ -177,7 +177,7 @@ async function main() {
     const keycloakConfig = {
         baseUrl: 'http://localhost:8080/auth',
         realm: 'your_realm',
-        clientId: 'your_client_id',
+        clientId: 'public',
         username: 'your_username',
         password: 'your_password',
         // SSL-Konfiguration (optional)
@@ -205,8 +205,8 @@ async function main() {
                     content: 'Erkläre mir die Grundlagen von Machine Learning'
                 }
             ],
-            'v1',
-            'gpt-4',
+            '2024-12-01',
+            'gpt-4o',
             {
                 maxTokens: 100,
                 temperature: 0.7
@@ -396,11 +396,11 @@ export class ApiClient {
 
     async getCompletions(
         messages: Array<{role: string; content: string}>, 
-        version: string = 'v1', 
-        model: string = 'gpt-4', 
+        apiVersion: string = '2024-12-01', 
+        model: string = 'gpt-4o', 
         options: Partial<CompletionRequest> = {}
     ): Promise<CompletionResponse> {
-        const url = `${this.baseUrl}/${version}/completions?api-version=2024-01-01&model=${model}`;
+        const url = `${this.baseUrl}/v1/completions?api-version=${apiVersion}&model=${model}`;
         
         const requestBody: CompletionRequest = {
             messages,
@@ -428,7 +428,7 @@ async function main(): Promise<void> {
     const keycloakConfig: KeycloakConfig = {
         baseUrl: 'http://localhost:8080/auth',
         realm: 'your_realm',
-        clientId: 'your_client_id',
+        clientId: 'public',
         username: 'your_username',
         password: 'your_password',
         // SSL-Konfiguration (optional)
@@ -456,8 +456,8 @@ async function main(): Promise<void> {
                     content: 'Erkläre mir die Grundlagen von Machine Learning'
                 }
             ],
-            'v1',
-            'gpt-4',
+            '2024-12-01',
+            'gpt-4o',
             {
                 max_tokens: 100,
                 temperature: 0.7
@@ -518,55 +518,9 @@ export { main };
 }
 ```
 
-## 5. SSL/TLS und Zertifikats-Konfiguration
 
-### CA-Zertifikat einbinden
-```javascript
-const keycloakConfig = {
-    baseUrl: 'https://keycloak.example.com/auth',
-    realm: 'your_realm',
-    clientId: 'your_client_id',
-    username: 'your_username',
-    password: 'your_password',
-    ssl: {
-        ca: fs.readFileSync('/path/to/ca-certificate.pem'),
-        rejectUnauthorized: true
-    }
-};
-```
 
-### Client-Zertifikat-Authentifizierung
-```javascript
-const keycloakConfig = {
-    baseUrl: 'https://keycloak.example.com/auth',
-    realm: 'your_realm',
-    clientId: 'your_client_id',
-    username: 'your_username',
-    password: 'your_password',
-    ssl: {
-        ca: fs.readFileSync('/path/to/ca-certificate.pem'),
-        cert: fs.readFileSync('/path/to/client-certificate.pem'),
-        key: fs.readFileSync('/path/to/client-key.pem'),
-        rejectUnauthorized: true
-    }
-};
-```
-
-### Zertifikats-Verifizierung deaktivieren (nur für Entwicklung!)
-```javascript
-const keycloakConfig = {
-    baseUrl: 'https://keycloak.example.com/auth',
-    realm: 'your_realm',
-    clientId: 'your_client_id',
-    username: 'your_username',
-    password: 'your_password',
-    ssl: {
-        rejectUnauthorized: false
-    }
-};
-```
-
-## 6. Installation und Ausführung
+## 5. Installation und Ausführung
 
 ```bash
 # Dependencies installieren
