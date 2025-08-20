@@ -16,7 +16,7 @@ Diese Dokumentation zeigt, wie Sie sich mit Keycloak über cURL verbinden und de
   "username": "your_username",
   "password": "your_password",
   "grant_type": "password",
-  "client_id": "your_client_id"
+  "client_id": "public"
 }
 ```
 
@@ -25,7 +25,7 @@ Diese Dokumentation zeigt, wie Sie sich mit Keycloak über cURL verbinden und de
 curl -X POST \
   "http://localhost:8080/auth/realms/your_realm/protocol/openid-connect/token" \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "username=your_username&password=your_password&grant_type=password&client_id=your_client_id"
+  -d "username=your_username&password=your_password&grant_type=password&client_id=public"
 ```
 
 ### cURL-Befehl mit CA-Zertifikat (optional)
@@ -34,7 +34,7 @@ curl -X POST \
   "https://localhost:8443/auth/realms/your_realm/protocol/openid-connect/token" \
   --cacert /path/to/ca-certificate.pem \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "username=your_username&password=your_password&grant_type=password&client_id=your_client_id"
+  -d "username=your_username&password=your_password&grant_type=password&client_id=public"
 ```
 
 ### cURL-Befehl mit CA-Zertifikat und Client-Zertifikat (optional)
@@ -45,7 +45,7 @@ curl -X POST \
   --cert /path/to/client-certificate.pem \
   --key /path/to/client-key.pem \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "username=your_username&password=your_password&grant_type=password&client_id=your_client_id"
+  -d "username=your_username&password=your_password&grant_type=password&client_id=public"
 ```
 
 ### Beispiel Response
@@ -68,7 +68,7 @@ curl -X POST \
 ### Completions API mit API-Version und Modell
 ```bash
 curl -X POST \
-  "https://api.example.com/v1/completions?api-version=2024-01-01&model=gpt-4" \
+  "https://api.example.com/v1/completions?api-version=${API_VERSION:-2024-12-01}&model=${MODEL:-gpt-4o}" \
   -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -H "Content-Type: application/json" \
   -d '{
@@ -91,9 +91,13 @@ curl -X POST \
 # Keycloak-Konfiguration
 KEYCLOAK_URL="http://localhost:8080/auth"
 REALM="your_realm"
-CLIENT_ID="your_client_id"
+CLIENT_ID="public"
 USERNAME="your_username"
 PASSWORD="your_password"
+
+# API-Konfiguration
+API_VERSION="2024-12-01"
+MODEL="gpt-4o"
 
 # Token abrufen
 echo "Token von Keycloak abrufen..."
@@ -117,7 +121,7 @@ echo "Token: ${ACCESS_TOKEN:0:50}..."
 # API mit Token aufrufen
 echo "API mit Token aufrufen..."
 API_RESPONSE=$(curl -s -X POST \
-  "https://api.example.com/v1/completions?api-version=2024-01-01&model=gpt-4" \
+  "https://api.example.com/v1/completions?api-version=$API_VERSION&model=$MODEL" \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -160,39 +164,9 @@ echo "API Response: $API_RESPONSE"
 }
 ```
 
-## 5. SSL/TLS und Zertifikats-Konfiguration
 
-### CA-Zertifikat einbinden
-```bash
-# CA-Zertifikat für HTTPS-Verbindungen
-curl --cacert /path/to/ca-certificate.pem \
-  "https://keycloak.example.com/auth/realms/your_realm/protocol/openid-connect/token"
 
-# Mehrere CA-Zertifikate
-curl --cacert /path/to/ca-bundle.pem \
-  "https://keycloak.example.com/auth/realms/your_realm/protocol/openid-connect/token"
-```
-
-### Client-Zertifikat-Authentifizierung
-```bash
-# Client-Zertifikat und privater Schlüssel
-curl --cert /path/to/client-cert.pem \
-  --key /path/to/client-key.pem \
-  --cacert /path/to/ca-cert.pem \
-  "https://keycloak.example.com/auth/realms/your_realm/protocol/openid-connect/token"
-```
-
-### Zertifikats-Verifizierung konfigurieren
-```bash
-# Zertifikat ignorieren (nur für Entwicklung!)
-curl -k "https://keycloak.example.com/auth/realms/your_realm/protocol/openid-connect/token"
-
-# Eigene CA-Zertifikate verwenden
-curl --capath /path/to/ca-directory \
-  "https://keycloak.example.com/auth/realms/your_realm/protocol/openid-connect/token"
-```
-
-## 6. Nützliche cURL-Optionen
+## 5. Nützliche cURL-Optionen
 
 - `-v`: Verbose Output für Debugging
 - `-s`: Silent Mode (keine Progress-Bar)
