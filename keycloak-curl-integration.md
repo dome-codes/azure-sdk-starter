@@ -28,25 +28,9 @@ curl -X POST \
   -d "username=your_username&password=your_password&grant_type=password&client_id=public"
 ```
 
-### cURL-Befehl mit CA-Zertifikat (optional)
-```bash
-curl -X POST \
-  "https://localhost:8443/auth/realms/your_realm/protocol/openid-connect/token" \
-  --cacert /path/to/ca-certificate.pem \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "username=your_username&password=your_password&grant_type=password&client_id=public"
-```
 
-### cURL-Befehl mit CA-Zertifikat und Client-Zertifikat (optional)
-```bash
-curl -X POST \
-  "https://localhost:8443/auth/realms/your_realm/protocol/openid-connect/token" \
-  --cacert /path/to/ca-certificate.pem \
-  --cert /path/to/client-certificate.pem \
-  --key /path/to/client-key.pem \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "username=your_username&password=your_password&grant_type=password&client_id=public"
-```
+
+
 
 ### Beispiel Response
 ```json
@@ -171,11 +155,7 @@ echo "API Response: $API_RESPONSE"
 - `-v`: Verbose Output für Debugging
 - `-s`: Silent Mode (keine Progress-Bar)
 - `-w`: Custom Output Format
-- `-k`: SSL-Zertifikat ignorieren (nur für Entwicklung)
-- `--cacert`: CA-Zertifikat-Datei
-- `--cert`: Client-Zertifikat-Datei
-- `--key`: Client-Schlüssel-Datei
-- `--capath`: Verzeichnis mit CA-Zertifikaten
+
 
 ### Beispiel mit Debug-Informationen
 ```bash
