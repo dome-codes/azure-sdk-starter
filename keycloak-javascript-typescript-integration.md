@@ -179,14 +179,7 @@ async function main() {
         realm: 'your_realm',
         clientId: 'public',
         username: 'your_username',
-        password: 'your_password',
-        // SSL-Konfiguration (optional)
-        ssl: {
-            ca: '/path/to/ca-certificate.pem',
-            cert: '/path/to/client-certificate.pem',
-            key: '/path/to/client-key.pem',
-            rejectUnauthorized: true
-        }
+        password: 'your_password'
     };
 
     try {
@@ -237,12 +230,6 @@ export interface KeycloakConfig {
     clientId: string;
     username: string;
     password: string;
-    ssl?: {
-        ca?: string;
-        cert?: string;
-        key?: string;
-        rejectUnauthorized?: boolean;
-    };
 }
 
 export interface TokenResponse {
@@ -430,14 +417,7 @@ async function main(): Promise<void> {
         realm: 'your_realm',
         clientId: 'public',
         username: 'your_username',
-        password: 'your_password',
-        // SSL-Konfiguration (optional)
-        ssl: {
-            ca: '/path/to/ca-certificate.pem',
-            cert: '/path/to/client-certificate.pem',
-            key: '/path/to/client-key.pem',
-            rejectUnauthorized: true
-        }
+        password: 'your_password'
     };
 
     try {
