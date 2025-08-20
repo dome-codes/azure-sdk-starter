@@ -174,15 +174,7 @@ keycloak:
   client-id: public
   username: your_username
   password: your_password
-  ssl:
-    ca-certificate-path: /path/to/ca-certificate.pem
-    client-certificate-path: /path/to/client-certificate.pem
-    client-key-path: /path/to/client-key.pem
-    reject-unauthorized: true
-    key-store-path: /path/to/keystore.jks
-    key-store-password: your_keystore_password
-    trust-store-path: /path/to/truststore.jks
-    trust-store-password: your_truststore_password
+
 
 api:
   base-url: https://api.example.com
@@ -238,20 +230,7 @@ public class KeycloakConfig {
     private String username;
     private String password;
     
-    // SSL-Konfiguration (optional)
-    private SslConfig ssl = new SslConfig();
-    
-    @Data
-    public static class SslConfig {
-        private String caCertificatePath;
-        private String clientCertificatePath;
-        private String clientKeyPath;
-        private boolean rejectUnauthorized = true;
-        private String keyStorePath;
-        private String keyStorePassword;
-        private String trustStorePath;
-        private String trustStorePassword;
-    }
+
 }
 ```
 
@@ -483,72 +462,11 @@ public class ApiClient {
 }
 ```
 
-## 5. Service Layer
 
-### CompletionService.java
-```java
-package com.example.keycloak.service;
 
-import com.example.keycloak.client.ApiClient;
-import com.example.keycloak.model.CompletionRequest;
-import com.example.keycloak.model.CompletionResponse;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-import reactor.core.publisher.Mono;
 
-@Slf4j
-@Service
-@RequiredArgsConstructor
-public class CompletionService {
-    
-    private final ApiClient apiClient;
-    
-    public Mono<CompletionResponse> getCompletions(CompletionRequest request, String apiVersion, String model) {
-        log.info("Completions API aufrufen - API Version: {}, Modell: {}", apiVersion, model);
-        return apiClient.getCompletions(request, apiVersion, model)
-                .doOnNext(response -> log.info("Completions erfolgreich abgerufen: {}", response.getChoices().size()));
-    }
-}
-```
 
-## 6. Controller
-
-### CompletionController.java
-```java
-package com.example.keycloak.controller;
-
-import com.example.keycloak.model.CompletionRequest;
-import com.example.keycloak.model.CompletionResponse;
-import com.example.keycloak.service.CompletionService;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.web.bind.annotation.*;
-import reactor.core.publisher.Mono;
-
-import jakarta.validation.Valid;
-
-@Slf4j
-@RestController
-@RequestMapping("/api/completions")
-@RequiredArgsConstructor
-public class CompletionController {
-    
-    private final CompletionService completionService;
-    
-    @PostMapping
-    public Mono<CompletionResponse> getCompletions(
-            @Valid @RequestBody CompletionRequest request,
-            @RequestParam(defaultValue = "2024-12-01") String apiVersion,
-            @RequestParam(defaultValue = "gpt-4o") String model) {
-        
-        log.info("POST /api/completions - API Version: {}, Modell: {}", apiVersion, model);
-        return completionService.getCompletions(request, apiVersion, model);
-    }
-}
-```
-
-## 7. Konfiguration
+## 5. Konfiguration
 
 ### WebClientConfig.java
 ```java
@@ -558,14 +476,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.reactive.function.client.WebClient;
-import io.netty.handler.ssl.SslContext;
-import io.netty.handler.ssl.SslContextBuilder;
-import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
-import javax.net.ssl.SSLException;
-import java.io.FileInputStream;
-import java.security.KeyStore;
-import java.security.cert.CertificateFactory;
-import java.security.cert.X509Certificate;
+
 
 @Configuration
 public class WebClientConfig {
@@ -574,43 +485,10 @@ public class WebClientConfig {
     private KeycloakConfig keycloakConfig;
     
     @Bean
-    public WebClient webClient() throws SSLException {
-        WebClient.Builder builder = WebClient.builder()
-                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(2 * 1024 * 1024));
-        
-        // SSL-Konfiguration (optional)
-        if (keycloakConfig.getSsl() != null && keycloakConfig.getSsl().getCaCertificatePath() != null) {
-            SslContext sslContext = createSslContext();
-            builder = builder.codecs(configurer -> 
-                configurer.defaultCodecs().maxInMemorySize(2 * 1024 * 1024));
-        }
-        
-        return builder.build();
-    }
-    
-    private SslContext createSslContext() throws SSLException {
-        try {
-            SslContextBuilder sslContextBuilder = SslContextBuilder.forClient();
-            
-            // CA-Zertifikat hinzufügen
-            if (keycloakConfig.getSsl().getCaCertificatePath() != null) {
-                CertificateFactory cf = CertificateFactory.getInstance("X.509");
-                X509Certificate caCert = (X509Certificate) cf.generateCertificate(
-                    new FileInputStream(keycloakConfig.getSsl().getCaCertificatePath()));
-                sslContextBuilder.trustManager(caCert);
-            }
-            
-            // Client-Zertifikat hinzufügen
-            if (keycloakConfig.getSsl().getClientCertificatePath() != null && 
-                keycloakConfig.getSsl().getClientKeyPath() != null) {
-                // Hier würde die Client-Zertifikat-Logik implementiert
-                // Vereinfachte Version für das Beispiel
-            }
-            
-            return sslContextBuilder.build();
-        } catch (Exception e) {
-            throw new SSLException("Fehler beim Erstellen des SSL-Kontexts", e);
-        }
+    public WebClient webClient() {
+        return WebClient.builder()
+                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(2 * 1024 * 1024))
+                .build();
     }
 }
 ```
@@ -633,7 +511,7 @@ public class KeycloakIntegrationApplication {
 }
 ```
 
-## 8. Beispiel Response
+## 6. Beispiel Response
 
 ### Erfolgreiche Authentifizierung
 ```json
@@ -687,7 +565,7 @@ public class KeycloakIntegrationApplication {
 }
 ```
 
-## 9. Fehlerbehandlung
+## 7. Fehlerbehandlung
 
 ### Token abgelaufen
 ```json
@@ -715,7 +593,7 @@ public class KeycloakIntegrationApplication {
 
 
 
-## 10. Ausführung
+## 8. Ausführung
 
 ```bash
 # Maven
@@ -728,17 +606,40 @@ mvn spring-boot:run
 mvn clean package
 java -jar target/keycloak-integration-1.0.0.jar
 
-# Mit SSL-System-Properties
-java -Djavax.net.ssl.trustStore=/path/to/truststore.jks \
-     -Djavax.net.ssl.trustStorePassword=your_password \
-     -jar target/keycloak-integration-1.0.0.jar
+
 ```
 
-## 11. API-Endpunkte testen
+## 9. Verwendung der Completions API
+
+### Beispiel: Completions API in Java aufrufen
+```java
+// Keycloak-Client initialisieren
+KeycloakClient keycloakClient = new KeycloakClient(keycloakConfig, webClient);
+
+// API-Client initialisieren
+ApiClient apiClient = new ApiClient(keycloakClient, webClient);
+
+// Completions-Request erstellen
+CompletionRequest request = new CompletionRequest();
+request.setMessages(Arrays.asList(
+    new CompletionRequest.Message("user", "Erkläre mir die Grundlagen von Machine Learning")
+));
+request.setMaxTokens(100);
+request.setTemperature(0.7);
+
+// API aufrufen
+CompletionResponse response = apiClient.getCompletions(request, "2024-12-01", "gpt-4o")
+    .block(); // Für synchrone Ausführung
+
+System.out.println("Completions Response: " + response.getChoices().get(0).getText());
+```
+
+## 10. API-Endpunkte testen
 
 ```bash
-# Completions API aufrufen
-curl -X POST "http://localhost:8080/api/completions?apiVersion=2024-12-01&model=gpt-4o" \
+# Completions API direkt aufrufen
+curl -X POST "https://api.example.com/v1/completions?api-version=2024-12-01&model=gpt-4o" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "messages": [
