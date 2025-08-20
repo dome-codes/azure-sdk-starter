@@ -171,7 +171,7 @@ spring:
 keycloak:
   auth-server-url: http://localhost:8080/auth
   realm: your_realm
-  client-id: your_client_id
+  client-id: public
   username: your_username
   password: your_password
   ssl:
@@ -204,7 +204,7 @@ spring.application.name=keycloak-integration
 # Keycloak Configuration
 keycloak.auth-server-url=http://localhost:8080/auth
 keycloak.realm=your_realm
-keycloak.client-id=your_client_id
+keycloak.client-id=public
 keycloak.username=your_username
 keycloak.password=your_password
 
@@ -469,8 +469,8 @@ public class ApiClient {
     @Value("${api.base-url}")
     private String baseUrl;
     
-    public Mono<CompletionResponse> getCompletions(CompletionRequest request, String version, String model) {
-        String url = String.format("%s/%s/completions?api-version=2024-01-01&model=%s", baseUrl, version, model);
+    public Mono<CompletionResponse> getCompletions(CompletionRequest request, String apiVersion, String model) {
+        String url = String.format("%s/v1/completions?api-version=%s&model=%s", baseUrl, apiVersion, model);
         
         return keycloakClient.getValidToken()
                 .flatMap(token -> webClient.post()
@@ -504,9 +504,9 @@ public class CompletionService {
     
     private final ApiClient apiClient;
     
-    public Mono<CompletionResponse> getCompletions(CompletionRequest request, String version, String model) {
-        log.info("Completions API aufrufen - Version: {}, Modell: {}", version, model);
-        return apiClient.getCompletions(request, version, model)
+    public Mono<CompletionResponse> getCompletions(CompletionRequest request, String apiVersion, String model) {
+        log.info("Completions API aufrufen - API Version: {}, Modell: {}", apiVersion, model);
+        return apiClient.getCompletions(request, apiVersion, model)
                 .doOnNext(response -> log.info("Completions erfolgreich abgerufen: {}", response.getChoices().size()));
     }
 }
@@ -539,11 +539,11 @@ public class CompletionController {
     @PostMapping
     public Mono<CompletionResponse> getCompletions(
             @Valid @RequestBody CompletionRequest request,
-            @RequestParam(defaultValue = "v1") String version,
-            @RequestParam(defaultValue = "gpt-4") String model) {
+            @RequestParam(defaultValue = "2024-12-01") String apiVersion,
+            @RequestParam(defaultValue = "gpt-4o") String model) {
         
-        log.info("POST /api/completions - Version: {}, Modell: {}", version, model);
-        return completionService.getCompletions(request, version, model);
+        log.info("POST /api/completions - API Version: {}, Modell: {}", apiVersion, model);
+        return completionService.getCompletions(request, apiVersion, model);
     }
 }
 ```
@@ -713,6 +713,8 @@ public class KeycloakIntegrationApplication {
 }
 ```
 
+
+
 ## 10. Ausführung
 
 ```bash
@@ -725,13 +727,18 @@ mvn spring-boot:run
 # JAR-Datei erstellen und ausführen
 mvn clean package
 java -jar target/keycloak-integration-1.0.0.jar
+
+# Mit SSL-System-Properties
+java -Djavax.net.ssl.trustStore=/path/to/truststore.jks \
+     -Djavax.net.ssl.trustStorePassword=your_password \
+     -jar target/keycloak-integration-1.0.0.jar
 ```
 
 ## 11. API-Endpunkte testen
 
 ```bash
 # Completions API aufrufen
-curl -X POST "http://localhost:8080/api/completions?version=v1&model=gpt-4" \
+curl -X POST "http://localhost:8080/api/completions?apiVersion=2024-12-01&model=gpt-4o" \
   -H "Content-Type: application/json" \
   -d '{
     "messages": [
