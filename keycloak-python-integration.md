@@ -26,15 +26,11 @@ asyncio-mqtt==0.16.1
 # Keycloak Configuration
 KEYCLOAK_AUTH_SERVER_URL=http://localhost:8080/auth
 KEYCLOAK_REALM=your_realm
-KEYCLOAK_CLIENT_ID=your_client_id
+KEYCLOAK_CLIENT_ID=public
 KEYCLOAK_USERNAME=your_username
 KEYCLOAK_PASSWORD=your_password
 
-# SSL Configuration (optional)
-KEYCLOAK_SSL_CA_CERT_PATH=/path/to/ca-certificate.pem
-KEYCLOAK_SSL_CLIENT_CERT_PATH=/path/to/client-certificate.pem
-KEYCLOAK_SSL_CLIENT_KEY_PATH=/path/to/client-key.pem
-KEYCLOAK_SSL_VERIFY=true
+
 
 # API Configuration
 API_BASE_URL=https://api.example.com
@@ -84,7 +80,7 @@ class KeycloakConfig(BaseModel):
     client_id: str = Field(..., alias="clientId")
     username: str
     password: str
-    ssl: Optional[Dict[str, any]] = Field(None, alias="ssl")
+
 
 class TokenResponse(BaseModel):
     access_token: str = Field(..., alias="accessToken")
@@ -147,31 +143,9 @@ class KeycloakClient:
         self.session.mount("http://", adapter)
         self.session.mount("https://", adapter)
         
-        # SSL-Konfiguration (optional)
-        if config.ssl:
-            self._configure_ssl()
+
     
-    def _configure_ssl(self):
-        """SSL-Konfiguration für die Session einrichten"""
-        try:
-            ssl_config = self.config.ssl
-            
-            # CA-Zertifikat
-            if ssl_config.get('ca_cert_path'):
-                self.session.verify = ssl_config['ca_cert_path']
-            
-            # Client-Zertifikat
-            if ssl_config.get('client_cert_path') and ssl_config.get('client_key_path'):
-                self.session.cert = (ssl_config['client_cert_path'], ssl_config['client_key_path'])
-            
-            # SSL-Verifizierung konfigurieren
-            if 'verify' in ssl_config:
-                self.session.verify = ssl_config['verify']
-                
-        except Exception as e:
-            logger.warning(f"SSL-Konfiguration fehlgeschlagen: {e}")
-            # Fallback: SSL-Verifizierung deaktivieren
-            self.session.verify = False
+
     
     def authenticate(self) -> str:
         """Authentifizierung bei Keycloak durchführen"""
@@ -265,7 +239,7 @@ class KeycloakClient:
 import logging
 from typing import List, Optional
 from keycloak_client import KeycloakClient
-from models import User, Product, ApiResponse
+from models import CompletionRequest, CompletionResponse
 
 logger = logging.getLogger(__name__)
 
@@ -274,12 +248,12 @@ class ApiClient:
         self.keycloak_client = keycloak_client
         self.base_url = base_url.rstrip('/')
     
-    def get_completions(self, messages: List[Dict[str, str]], version: str = 'v1', model: str = 'gpt-4', options: dict = None) -> CompletionResponse:
+    def get_completions(self, messages: List[Dict[str, str]], api_version: str = '2024-12-01', model: str = 'gpt-4o', options: dict = None) -> CompletionResponse:
         """Completions API aufrufen"""
         if options is None:
             options = {}
             
-        url = f"{self.base_url}/{version}/completions?api-version=2024-01-01&model={model}"
+        url = f"{self.base_url}/v1/completions?api-version={api_version}&model={model}"
         
         request_body = {
             'messages': messages,
@@ -412,7 +386,7 @@ class AsyncKeycloakClient:
 import logging
 from typing import List
 from async_keycloak_client import AsyncKeycloakClient
-from models import User, Product, ApiResponse
+from models import CompletionRequest, CompletionResponse
 
 logger = logging.getLogger(__name__)
 
@@ -421,15 +395,25 @@ class AsyncApiClient:
         self.keycloak_client = keycloak_client
         self.base_url = base_url.rstrip('/')
     
-    async def get_users(self, version: str = 'v1', model: str = 'detailed') -> ApiResponse[List[User]]:
-        """Benutzer asynchron abrufen"""
-        url = f"{self.base_url}/{version}/users?model={model}"
+    async def get_completions(self, messages: List[Dict[str, str]], api_version: str = '2024-12-01', model: str = 'gpt-4o', options: dict = None) -> CompletionResponse:
+        """Completions API asynchron aufrufen"""
+        if options is None:
+            options = {}
+            
+        url = f"{self.base_url}/v1/completions?api-version={api_version}&model={model}"
+        
+        request_body = {
+            'messages': messages,
+            'max_tokens': options.get('max_tokens', 100),
+            'temperature': options.get('temperature', 0.7),
+            **options
+        }
         
         try:
-            response_data = await self.keycloak_client.make_api_call(url, method='GET')
-            return ApiResponse(**response_data)
+            response_data = await self.keycloak_client.make_api_call(url, method='POST', json=request_body)
+            return CompletionResponse(**response_data)
         except Exception as e:
-            logger.error(f"Fehler beim Abrufen der Benutzer: {e}")
+            logger.error(f"Fehler beim Aufrufen der Completions API: {e}")
             raise
     
     async def create_product(self, product_data: Product, version: str = 'v2', model: str = 'full') -> ApiResponse[Product]:
@@ -488,24 +472,12 @@ load_dotenv()
 
 def get_keycloak_config() -> KeycloakConfig:
     """Keycloak-Konfiguration aus Umgebungsvariablen laden"""
-    ssl_config = None
-    
-    # SSL-Konfiguration prüfen
-    if os.getenv('KEYCLOAK_SSL_CA_CERT_PATH'):
-        ssl_config = {
-            'ca_cert_path': os.getenv('KEYCLOAK_SSL_CA_CERT_PATH'),
-            'client_cert_path': os.getenv('KEYCLOAK_SSL_CLIENT_CERT_PATH'),
-            'client_key_path': os.getenv('KEYCLOAK_SSL_CLIENT_KEY_PATH'),
-            'verify': os.getenv('KEYCLOAK_SSL_VERIFY', 'true').lower() == 'true'
-        }
-    
     return KeycloakConfig(
         auth_server_url=os.getenv('KEYCLOAK_AUTH_SERVER_URL', 'http://localhost:8080/auth'),
         realm=os.getenv('KEYCLOAK_REALM', 'your_realm'),
         client_id=os.getenv('KEYCLOAK_CLIENT_ID', 'your_client_id'),
         username=os.getenv('KEYCLOAK_USERNAME', 'your_username'),
-        password=os.getenv('KEYCLOAK_PASSWORD', 'your_password'),
-        ssl=ssl_config
+        password=os.getenv('KEYCLOAK_PASSWORD', 'your_password')
     )
 
 def get_api_config() -> dict:
@@ -558,8 +530,8 @@ def main_sync():
         
         completion_response = api_client.get_completions(
             messages, 
-            'v1', 
-            'gpt-4',
+            '2024-12-01', 
+            'gpt-4o',
             {
                 'max_tokens': 100,
                 'temperature': 0.7
@@ -582,22 +554,25 @@ async def main_async():
         async with AsyncKeycloakClient(keycloak_config) as keycloak_client:
             api_client = AsyncApiClient(keycloak_client, api_config['base_url'])
             
-            # Beispiel: Benutzer abrufen
-            print("Benutzer abrufen (async)...")
-            users_response = await api_client.get_users(api_config['version'], api_config['model'])
-            print(f"Benutzer erfolgreich abgerufen: {len(users_response.data)}")
+            # Beispiel: Completions API aufrufen (async)...
+            print("Completions API aufrufen (async)...")
+            messages = [
+                {
+                    "role": "user",
+                    "content": "Erkläre mir die Grundlagen von Machine Learning"
+                }
+            ]
             
-            # Beispiel: Produkt erstellen
-            print("Produkt erstellen (async)...")
-            new_product = Product(
-                name="Neues Produkt Async",
-                description="Produktbeschreibung Async",
-                price=149.99,
-                category="electronics"
+            completion_response = await api_client.get_completions(
+                messages, 
+                '2024-12-01', 
+                'gpt-4o',
+                {
+                    'max_tokens': 100,
+                    'temperature': 0.7
+                }
             )
-            
-            created_product_response = await api_client.create_product(new_product, 'v2', 'full')
-            print(f"Produkt erfolgreich erstellt: {created_product_response.data.name}")
+            print(f"Completions erfolgreich abgerufen: {completion_response.choices[0]['text']}")
             
     except Exception as e:
         logging.error(f"Fehler in der asynchronen Hauptfunktion: {e}")
@@ -691,60 +666,9 @@ if __name__ == "__main__":
 }
 ```
 
-## 10. SSL/TLS und Zertifikats-Konfiguration
 
-### CA-Zertifikat einbinden
-```python
-# Über Umgebungsvariablen
-export KEYCLOAK_SSL_CA_CERT_PATH=/path/to/ca-certificate.pem
-export KEYCLOAK_SSL_VERIFY=true
 
-# Oder direkt im Code
-keycloak_config = KeycloakConfig(
-    auth_server_url="https://keycloak.example.com/auth",
-    realm="your_realm",
-    client_id="your_client_id",
-    username="your_username",
-    password="your_password",
-    ssl={
-        'ca_cert_path': '/path/to/ca-certificate.pem',
-        'verify': True
-    }
-)
-```
-
-### Client-Zertifikat-Authentifizierung
-```python
-keycloak_config = KeycloakConfig(
-    auth_server_url="https://keycloak.example.com/auth",
-    realm="your_realm",
-    client_id="your_client_id",
-    username="your_username",
-    password="your_password",
-    ssl={
-        'ca_cert_path': '/path/to/ca-certificate.pem',
-        'client_cert_path': '/path/to/client-certificate.pem',
-        'client_key_path': '/path/to/client-key.pem',
-        'verify': True
-    }
-)
-```
-
-### SSL-Verifizierung deaktivieren (nur für Entwicklung!)
-```python
-keycloak_config = KeycloakConfig(
-    auth_server_url="https://keycloak.example.com/auth",
-    realm="your_realm",
-    client_id="your_client_id",
-    username="your_username",
-    password="your_password",
-    ssl={
-        'verify': False
-    }
-)
-```
-
-## 11. Installation und Ausführung
+## 10. Installation und Ausführung
 
 ```bash
 # Dependencies installieren
@@ -763,7 +687,7 @@ python -c "from main import main_sync; main_sync()"
 python -c "import asyncio; from main import main_async; asyncio.run(main_async())"
 ```
 
-## 12. Tests
+## 11. Tests
 
 ### test_keycloak_client.py
 ```python
@@ -816,7 +740,7 @@ def test_authenticate_success(mock_post, keycloak_client):
     assert keycloak_client.token_expiry is not None
 ```
 
-## 13. CLI-Tool
+## 12. CLI-Tool
 
 ### cli.py
 ```python
@@ -886,7 +810,7 @@ if __name__ == '__main__':
     cli()
 ```
 
-## 14. Verwendung des CLI-Tools
+## 13. Verwendung des CLI-Tools
 
 ```bash
 # Benutzer abrufen
