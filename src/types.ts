@@ -211,6 +211,8 @@ export interface CompletionRequest {
   }>;
   /** Model to use for completion */
   model?: ModelType;
+  /** API version for the request */
+  api_version?: string;
   /** Maximum number of tokens to generate */
   max_tokens?: number;
   /** Sampling temperature (0-2) */
@@ -237,6 +239,8 @@ export interface EmbeddingRequest {
   input: string | string[];
   /** Model to use for embeddings */
   model?: ModelType;
+  /** API version for the request */
+  api_version?: string;
   /** Input type */
   input_type?: string;
   /** Encoding format */
@@ -253,6 +257,8 @@ export interface ImageGenerationRequest {
   prompt: string;
   /** Model to use for generation */
   model?: ModelType;
+  /** API version for the request */
+  api_version?: string;
   /** Image quality */
   quality?: Quality;
   /** Image style */

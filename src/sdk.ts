@@ -14,8 +14,10 @@ export class RAGClient {
   private client: AxiosInstance;
   private authManager?: AuthManager;
   private useAuth: boolean;
+  private config: RAGConfig;
 
   constructor(config?: RAGConfig) {
+    this.config = config || {};
     this.useAuth = !!(config?.username && config?.password);
     
     // Axios Client konfigurieren
@@ -33,7 +35,7 @@ export class RAGClient {
       this.authManager = new AuthManager({
         username: config.username!,
         password: config.password!,
-        authUrl: config.authUrl || 'http://localhost:8080/auth/realms/rag-api-realm/protocol/openid-connect/token',
+        authUrl: config.authUrl || 'http://localhost:8080/realms/rag-api-realm/protocol/openid-connect/token',
         clientId: config.clientId || 'your-client-id',
         scope: config.scope || 'openid profile email'
       });
@@ -48,15 +50,31 @@ export class RAGClient {
    * @private
    */
   private setupAuthInterceptor() {
-    // Request Interceptor - Token hinzufügen
+    // Request Interceptor - Token und globale Parameter hinzufügen
     this.client.interceptors.request.use(
       async (config) => {
+        // Token hinzufügen
         if (this.useAuth && this.authManager) {
           const token = await this.authManager.getValidToken();
           if (token) {
             config.headers.Authorization = `Bearer ${token}`;
           }
         }
+
+        // Globale Parameter als Query-Parameter hinzufügen
+        if (this.config.deploymentName || this.config.apiVersion) {
+          const url = new URL(config.url || '', this.config.baseURL);
+          
+          if (this.config.deploymentName) {
+            url.searchParams.set('deployment_name', this.config.deploymentName);
+          }
+          if (this.config.apiVersion) {
+            url.searchParams.set('api_version', this.config.apiVersion);
+          }
+          
+          config.url = url.pathname + url.search;
+        }
+
         return config;
       },
       (error) => Promise.reject(error)
@@ -136,7 +154,14 @@ export class RAGClient {
    */
   async generateCompletion(params: CompletionRequest): Promise<CompletionResponse> {
     try {
-      const response = await this.client.post('/v1/ai/completions', params);
+      // Model als Query-Parameter, Rest im Body (api_version wird automatisch vom Interceptor hinzugefügt)
+      const { model, ...bodyParams } = params;
+      const queryParams = new URLSearchParams();
+      
+      if (model) queryParams.append('model', model);
+      
+      const url = `/v1/ai/completions${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+      const response = await this.client.post(url, bodyParams);
       return response.data;
     } catch (error) {
       throw new Error(`Completion generation failed: ${error}`);
@@ -160,7 +185,14 @@ export class RAGClient {
    */
   async createEmbeddings(params: EmbeddingRequest): Promise<EmbeddingResponse> {
     try {
-      const response = await this.client.post('/v1/ai/embeddings', params);
+      // Model als Query-Parameter, Rest im Body (api_version wird automatisch vom Interceptor hinzugefügt)
+      const { model, ...bodyParams } = params;
+      const queryParams = new URLSearchParams();
+      
+      if (model) queryParams.append('model', model);
+      
+      const url = `/v1/ai/embeddings${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+      const response = await this.client.post(url, bodyParams);
       return response.data;
     } catch (error) {
       throw new Error(`Embedding creation failed: ${error}`);
@@ -189,7 +221,14 @@ export class RAGClient {
    */
   async generateImage(params: ImageGenerationRequest): Promise<ImageGenerationResponse> {
     try {
-      const response = await this.client.post('/v1/ai/images/generations', params);
+      // Model als Query-Parameter, Rest im Body (api_version wird automatisch vom Interceptor hinzugefügt)
+      const { model, ...bodyParams } = params;
+      const queryParams = new URLSearchParams();
+      
+      if (model) queryParams.append('model', model);
+      
+      const url = `/v1/ai/images/generations${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+      const response = await this.client.post(url, bodyParams);
       return response.data;
     } catch (error) {
       throw new Error(`Image generation failed: ${error}`);
