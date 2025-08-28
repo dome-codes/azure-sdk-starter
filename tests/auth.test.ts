@@ -55,7 +55,7 @@ describe('AuthManager', () => {
 
       const token = await authManager.authenticate();
 
-      expect(mockPost).toHaveBeenCalledWith('/oauth2/v2.0/token', expect.any(URLSearchParams));
+      expect(mockPost).toHaveBeenCalledWith('/protocol/openid-connect/token', expect.any(URLSearchParams));
       expect(token).toBe('test-access-token');
     });
 

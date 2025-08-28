@@ -68,7 +68,7 @@ export class AuthManager {
       params.append('client_secret', this.config.clientSecret);
     }
 
-    const response = await this.client.post('/oauth2/v2.0/token', params);
+    const response = await this.client.post('/protocol/openid-connect/token', params);
     return response.data;
   }
 
@@ -91,7 +91,7 @@ export class AuthManager {
       params.append('client_secret', this.config.clientSecret);
     }
 
-    const response = await this.client.post('/oauth2/v2.0/token', params);
+    const response = await this.client.post('/protocol/openid-connect/token', params);
     const tokenData: TokenResponse = response.data;
     
     this.accessToken = tokenData.access_token;
