@@ -1,7 +1,7 @@
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
-  roots: ['<rootDir>/tests'],
+  roots: ['<rootDir>/src', '<rootDir>/tests'],
   testMatch: [
     '**/__tests__/**/*.ts',
     '**/?(*.)+(spec|test).ts'
@@ -25,15 +25,4 @@ module.exports = {
     '/node_modules/',
     '/src/generated/'
   ],
-  // Verbesserte Test-Performance
-  maxWorkers: '50%',
-  testTimeout: 10000,
-  // Bessere Fehlerberichte
-  verbose: true,
-  // Ignore build artifacts
-  testPathIgnorePatterns: [
-    '/node_modules/',
-    '/dist/',
-    '/coverage/'
-  ]
 }; 

@@ -4,6 +4,9 @@ export interface AuthConfig {
   username: string;
   password: string;
   authUrl?: string;
+  clientId?: string;
+  clientSecret?: string;
+  scope?: string;
 }
 
 export interface TokenResponse {
@@ -11,6 +14,7 @@ export interface TokenResponse {
   refresh_token?: string;
   expires_in: number;
   token_type: string;
+  scope?: string;
 }
 
 export class AuthManager {
@@ -44,8 +48,7 @@ export class AuthManager {
       
       return this.accessToken;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      throw new Error(`Authentication failed: ${errorMessage}`);
+      throw new Error(`Authentication failed: ${error}`);
     }
   }
 
@@ -57,9 +60,13 @@ export class AuthManager {
       grant_type: 'password',
       username: this.config.username,
       password: this.config.password,
-      client_id: 'default-client-id',
-      scope: 'openid profile email',
+      client_id: this.config.clientId || 'default-client-id',
+      scope: this.config.scope || 'openid profile email',
     });
+
+    if (this.config.clientSecret) {
+      params.append('client_secret', this.config.clientSecret);
+    }
 
     const response = await this.client.post('/oauth2/v2.0/token', params);
     return response.data;
@@ -76,9 +83,13 @@ export class AuthManager {
     const params = new URLSearchParams({
       grant_type: 'refresh_token',
       refresh_token: this.refreshToken,
-      client_id: 'default-client-id',
-      scope: 'openid profile email',
+      client_id: this.config.clientId || 'default-client-id',
+      scope: this.config.scope || 'openid profile email',
     });
+
+    if (this.config.clientSecret) {
+      params.append('client_secret', this.config.clientSecret);
+    }
 
     const response = await this.client.post('/oauth2/v2.0/token', params);
     const tokenData: TokenResponse = response.data;

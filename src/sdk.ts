@@ -1,184 +1,238 @@
-import { AzureOpenAIClient } from './azure-openai-sdk';
-
-// Types für die RAG API Requests
-export interface CompletionRequest {
-  prompt: string;
-  max_tokens?: number;
-  temperature?: number;
-  [key: string]: string | number | undefined;
-}
-
-export interface EmbeddingRequest {
-  input: string | string[];
-  model?: string;
-  [key: string]: string | string[] | undefined;
-}
-
-export interface ChunkRequest {
-  text: string;
-  chunk_size?: number;
-  overlap?: number;
-  [key: string]: string | number | undefined;
-}
-
-export interface SummarizeRequest {
-  text: string;
-  max_length?: number;
-  [key: string]: string | number | undefined;
-}
-
-// Configuration Interface
-export interface RAGConfig {
-  // Azure OpenAI Konfiguration (erforderlich)
-  endpoint: string;
-  
-  // Authentifizierung - entweder API Key ODER Username/Password
-  apiKey?: string;                    // Für Azure OpenAI
-  username?: string;                   // Für RAG-API
-  password?: string;                   // Für RAG-API
-  
-  // Optionale Azure-Parameter (werden im Backend gesetzt falls nicht angegeben)
-  deploymentName?: string;
-  embeddingDeploymentName?: string;
-  apiVersion?: string;
-  
-  // Managed Identity für Azure OpenAI (optional)
-  useManagedIdentity?: boolean;
-  
-  // Fallback für direkte API-Key-Nutzung
-  headers?: Record<string, string>;
-  
-  // SSL/TLS Konfiguration (optional)
-  sslOptions?: {
-    rejectUnauthorized?: boolean;      // SSL-Zertifikat-Validierung (Standard: true)
-    ca?: string | Buffer;             // Custom CA-Zertifikat
-    cert?: string | Buffer;           // Client-Zertifikat
-    key?: string | Buffer;            // Client-Schlüssel
-  };
-}
+import axios, { AxiosInstance } from 'axios';
+import { AuthManager } from './auth';
+import {
+  CompletionRequest,
+  CompletionResponse,
+  EmbeddingRequest,
+  EmbeddingResponse,
+  ImageGenerationRequest,
+  ImageGenerationResponse,
+  RAGConfig
+} from './types';
 
 export class RAGClient {
-  private readonly azureClient: AzureOpenAIClient;
+  private client: AxiosInstance;
+  private authManager?: AuthManager;
+  private useAuth: boolean;
 
-  constructor(config: RAGConfig) {
-    // Endpoint validieren
-    if (!config.endpoint) {
-      throw new Error('Endpoint is required');
-    }
+  constructor(config?: RAGConfig) {
+    this.useAuth = !!(config?.username && config?.password);
     
-    // Azure OpenAI Client erstellen
-    const azureConfig: any = {
-      endpoint: config.endpoint,
-      deploymentName: config.deploymentName || 'gpt-4',
-      embeddingDeploymentName: config.embeddingDeploymentName || 'text-embedding-ada-002'
-    };
-    
-    // SSL/TLS Konfiguration anwenden
-    if (config.sslOptions) {
-      // SSL-Optionen für Node.js https-Agent
-      if (config.sslOptions.rejectUnauthorized !== undefined) {
-        process.env.NODE_TLS_REJECT_UNAUTHORIZED = config.sslOptions.rejectUnauthorized ? '1' : '0';
+    // Axios Client konfigurieren
+    this.client = axios.create({
+      baseURL: config?.baseURL || 'http://localhost:3000',
+      timeout: config?.timeout || 30000,
+      headers: {
+        'Content-Type': 'application/json',
+        ...config?.headers
       }
-      
-      // Weitere SSL-Optionen können hier hinzugefügt werden
-      if (config.sslOptions.ca) azureConfig.ca = config.sslOptions.ca;
-      if (config.sslOptions.cert) azureConfig.cert = config.sslOptions.cert;
-      if (config.sslOptions.key) azureConfig.key = config.sslOptions.key;
+    });
+
+    // Auth Manager initialisieren (falls Username/Password konfiguriert)
+    if (this.useAuth && config) {
+      this.authManager = new AuthManager({
+        username: config.username!,
+        password: config.password!,
+        authUrl: 'https://login.microsoftonline.com/common/oauth2/v2.0/token',
+        clientId: 'your-client-id',
+        scope: 'openid profile email'
+      });
     }
-    
-    // Authentifizierung: entweder API Key ODER Managed Identity ODER Username/Password
-    if (config.apiKey) {
-      azureConfig.apiKey = config.apiKey;
-    } else if (config.useManagedIdentity) {
-      azureConfig.useManagedIdentity = config.useManagedIdentity;
-    } else if (config.username && config.password) {
-      // Username/Password für RAG-API - Azure OpenAI wird über das Backend aufgerufen
-      // Für jetzt verwenden wir einen Dummy-API-Key, da das Backend die Authentifizierung handhabt
-      azureConfig.apiKey = 'dummy-key-for-rag-api';
-    } else {
-      throw new Error('Either apiKey, useManagedIdentity, or username/password must be provided');
-    }
-    
-    if (config.apiVersion) azureConfig.apiVersion = config.apiVersion;
-    
-    this.azureClient = new AzureOpenAIClient(azureConfig);
+
+    // Auth Interceptor einrichten
+    this.setupAuthInterceptor();
   }
 
   /**
-   * Generiert Text-Completion direkt über Azure OpenAI
+   * Sets up authentication interceptors for automatic token management
+   * @private
    */
-  async generateCompletion(params: CompletionRequest): Promise<unknown> {
+  private setupAuthInterceptor() {
+    // Request Interceptor - Token hinzufügen
+    this.client.interceptors.request.use(
+      async (config) => {
+        if (this.useAuth && this.authManager) {
+          const token = await this.authManager.getValidToken();
+          if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+          }
+        }
+        return config;
+      },
+      (error) => Promise.reject(error)
+    );
+
+    // Response Interceptor - Token refresh bei 401
+    this.client.interceptors.response.use(
+      (response) => response,
+      async (error) => {
+        if (error.response?.status === 401 && this.useAuth && this.authManager) {
+          try {
+            // Token refresh versuchen
+            const newToken = await this.authManager.getValidToken();
+            // Request mit neuem Token wiederholen
+            const originalRequest = error.config;
+            originalRequest.headers.Authorization = `Bearer ${newToken}`;
+            return this.client(originalRequest);
+          } catch (refreshError) {
+            console.error('Token refresh failed:', refreshError);
+          }
+        }
+        return Promise.reject(error);
+      }
+    );
+  }
+
+  /**
+   * Authenticates the user using OAuth2 (only for username/password auth)
+   * @returns Promise<string | null> - The access token or null if no auth manager
+   */
+  async authenticate(): Promise<string | null> {
+    if (this.authManager) {
+      return this.authManager.authenticate();
+    }
+    return null;
+  }
+
+  /**
+   * Returns the current token status
+   * @returns Token status object or null if no auth manager
+   */
+  getTokenStatus() {
+    if (this.authManager) {
+      return this.authManager.getTokenStatus();
+    }
+    return null;
+  }
+
+  /**
+   * Clears all stored tokens
+   */
+  clearTokens(): void {
+    if (this.authManager) {
+      this.authManager.clearTokens();
+    }
+  }
+
+  /**
+   * Generates text completion using the RAG API
+   * @param params - Completion request parameters including messages, model, and generation options
+   * @returns Promise<CompletionResponse> - The completion response with choices and usage information
+   * @throws Error if the request fails
+   * 
+   * @example
+   * ```typescript
+   * const completion = await ragClient.generateCompletion({
+   *   messages: [
+   *     { role: Role.SYSTEM, content: 'You are a helpful assistant.' },
+   *     { role: Role.USER, content: 'Explain RAG in simple terms' }
+   *   ],
+   *   model: ModelType.GPT_4,
+   *   max_tokens: 300,
+   *   temperature: 0.7
+   * });
+   * console.log(completion.choices[0].message.content);
+   * ```
+   */
+  async generateCompletion(params: CompletionRequest): Promise<CompletionResponse> {
     try {
-      const completionParams: any = {
-        prompt: params.prompt
-      };
-      
-      if (params.max_tokens !== undefined) completionParams.maxTokens = params.max_tokens;
-      if (params.temperature !== undefined) completionParams.temperature = params.temperature;
-      
-      const result = await this.azureClient.generateCompletion(completionParams);
-      return result;
+      const response = await this.client.post('/v1/ai/completions', params);
+      return response.data;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      throw new Error(`Completion generation failed: ${errorMessage}`);
+      throw new Error(`Completion generation failed: ${error}`);
     }
   }
 
   /**
-   * Erstellt Embeddings direkt über Azure OpenAI
+   * Creates embeddings using the RAG API
+   * @param params - Embedding request parameters including input text and model options
+   * @returns Promise<EmbeddingResponse> - The embedding response with vector data and usage information
+   * @throws Error if the request fails
+   * 
+   * @example
+   * ```typescript
+   * const embedding = await ragClient.createEmbeddings({
+   *   input: "This is a sample text for embeddings",
+   *   model: ModelType.TEXT_EMBEDDING_ADA_002
+   * });
+   * console.log('Embedding vector:', embedding.data[0].embedding.slice(0, 5));
+   * ```
    */
-  async createEmbeddings(params: EmbeddingRequest): Promise<unknown> {
+  async createEmbeddings(params: EmbeddingRequest): Promise<EmbeddingResponse> {
     try {
-      const embeddingParams: any = {
-        input: params.input
-      };
-      
-      if (params.model !== undefined) embeddingParams.model = params.model;
-      
-      const result = await this.azureClient.createEmbeddings(embeddingParams);
-      return result;
+      const response = await this.client.post('/v1/ai/embeddings', params);
+      return response.data;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      throw new Error(`Embedding creation failed: ${errorMessage}`);
+      throw new Error(`Embedding creation failed: ${error}`);
     }
   }
 
   /**
-   * Text chunking (eigene RAG-API über dein Backend)
+   * Generates images using the RAG API
+   * @param params - Image generation request parameters including prompt, model, and style options
+   * @returns Promise<ImageGenerationResponse> - The image generation response with image URLs or base64 data
+   * @throws Error if the request fails
+   * 
+   * @example
+   * ```typescript
+   * const image = await ragClient.generateImage({
+   *   prompt: "A modern logo for an AI company",
+   *   model: ModelType.GPT_4,
+   *   quality: Quality.HD,
+   *   style: Style.NATURAL,
+   *   size: Size.SIZE_1024,
+   *   response_format: ResponseFormat.URL,
+   *   n: 1
+   * });
+   * console.log('Image URL:', image.data[0].url);
+   * ```
    */
-  async chunkText(_params: ChunkRequest): Promise<unknown> {
-    // Für jetzt werfen wir einen Fehler, da die Backend-Integration noch nicht implementiert ist
-    throw new Error('Chunking not yet implemented - requires backend integration');
-  }
-
-  /**
-   * Text zusammenfassen (eigene RAG-API über dein Backend)
-   */
-  async summarizeText(_params: SummarizeRequest): Promise<unknown> {
-    // Für jetzt werfen wir einen Fehler, da die Backend-Integration noch nicht implementiert ist
-    throw new Error('Summarization not yet implemented - requires backend integration');
-  }
-
-  /**
-   * Gibt den Azure OpenAI Client zurück für direkten Zugriff
-   */
-  getAzureClient(): AzureOpenAIClient {
-    return this.azureClient;
+  async generateImage(params: ImageGenerationRequest): Promise<ImageGenerationResponse> {
+    try {
+      const response = await this.client.post('/v1/ai/images/generations', params);
+      return response.data;
+    } catch (error) {
+      throw new Error(`Image generation failed: ${error}`);
+    }
   }
 }
 
+/**
+ * Main RAG SDK class that provides a simplified interface
+ * for all RAG operations including authentication and API calls
+ */
 export class RAGSDK {
   public rag: RAGClient;
 
-  constructor(config: RAGConfig) {
+  /**
+   * Creates a new RAG SDK instance
+   * @param config - Optional configuration for the SDK
+   */
+  constructor(config?: RAGConfig) {
     this.rag = new RAGClient(config);
   }
 
   /**
-   * Gibt den Azure OpenAI Client zurück
+   * Authenticates the user using OAuth2
+   * @returns Promise<string | null> - The access token or null
    */
-  getAzureClient() {
-    return this.rag.getAzureClient();
+  async authenticate(): Promise<string | null> {
+    return this.rag.authenticate();
+  }
+
+  /**
+   * Returns the current token status
+   * @returns Token status object or null
+   */
+  getTokenStatus() {
+    return this.rag.getTokenStatus();
+  }
+
+  /**
+   * Clears all stored tokens
+   */
+  clearTokens(): void {
+    this.rag.clearTokens();
   }
 }
 

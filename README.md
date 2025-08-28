@@ -1,285 +1,114 @@
-# RAG SDK - Retrieval-Augmented Generation SDK
+# RAG SDK - Azure OpenAI Integration
 
-Ein TypeScript/JavaScript SDK für Retrieval-Augmented Generation (RAG) Services, das als **einheitlicher Proxy** für Azure OpenAI und eigene APIs fungiert.
-
-## 🎯 Konzept
-
-Das RAG SDK ist ein **intelligenter Proxy**, der:
-- **OAuth2-Authentifizierung** mit Username/Passwort handhabt
-- **Azure OpenAI-kompatible API-Endpunkte** verwendet (`/chat/completions`, `/embeddings`)
-- **Deine Backend-API** als Proxy für Azure OpenAI nutzt
-- **Identische Request/Response-Formate** zu Azure OpenAI bereitstellt
+Ein TypeScript SDK für Retrieval-Augmented Generation (RAG) mit Azure OpenAI Integration.
 
 ## 🚀 Features
 
-### 🔐 Einheitliche Authentifizierung
-- **Username/Passwort-Authentifizierung** über OAuth2
-- **Automatische Token-Verwaltung** mit Refresh-Logik
-- **Einmalige Anmeldung** für alle Services
-- **Bearer-Token** wird automatisch für alle API-Calls verwendet
-
-### 🤖 Azure OpenAI-kompatible API
-- **Identische Endpunkte** zu Azure OpenAI (`/chat/completions`, `/embeddings`)
-- **Gleiche Request/Response-Formate** wie Azure OpenAI
-- **Dein Backend** leitet Calls an Azure OpenAI weiter
-- **Transparente Nutzung** - du verwendest die gleichen API-Aufrufe wie bei Azure OpenAI
-
-### 🛠️ RAG-Funktionalitäten
-- **Text Completion** - Generierung von Antworten (über `/chat/completions`)
-- **Embeddings** - Vektorisierung von Texten (über `/embeddings`)
-- **Text Chunking** - Aufteilung langer Texte (über `/chunk`)
-- **Text Summarization** - Zusammenfassung von Inhalten (über `/summarize`)
+- **OAuth2 Authentifizierung** mit Username/Password
+- **Azure OpenAI Integration** über Backend-Proxy
+- **Text Completion** mit Chat-Format
+- **Embeddings** mit verschiedenen Modellen
+- **Image Generation** mit allen Optionen
+- **Text Chunking** (geplant)
+- **Text Summarization** (geplant)
+- **Type-Safe Enums** für alle Parameter
+- **Automatische Token-Verwaltung**
 
 ## 📦 Installation
 
 ```bash
-npm install rag-sdk
+npm install
+npm run build
 ```
 
 ## 🔧 Konfiguration
 
-### Einheitliche Konfiguration (Empfohlen)
-
 ```typescript
-import { RAGSDK } from 'rag-sdk';
+import { RAGSDK } from './dist';
 
 const rag = new RAGSDK({
-  // Azure OpenAI Konfiguration (erforderlich)
-  endpoint: 'https://your-resource.openai.azure.com/',
-  apiKey: 'your-azure-api-key',
-  
-  // Optionale Azure-Parameter (werden im Backend gesetzt falls nicht angegeben)
-  deploymentName: 'gpt-4',
-  embeddingDeploymentName: 'text-embedding-ada-002',
-  apiVersion: '2024-02-15-preview',
-  
-  // OAuth2-Authentifizierung für RAG-spezifische Features (optional)
   username: 'your-username',
   password: 'your-password',
-  baseURL: 'https://your-rag-endpoint.com'
+  baseURL: 'https://your-rag-endpoint.com',
+  
+  // Optionale Azure-Parameter
+  deploymentName: 'gpt-4',
+  apiVersion: '2024-02-15-preview',
+  
+  // Erweiterte Konfiguration
+  timeout: 30000,
+  maxRetries: 3,
+  logLevel: 'info'
 });
 ```
 
-### Nur Azure OpenAI (ohne RAG-Features)
+## 📚 Beispiele
 
-```typescript
-const rag = new RAGSDK({
-  endpoint: 'https://your-resource.openai.azure.com/',
-  apiKey: 'your-azure-api-key'
-  // deploymentName, embeddingDeploymentName und apiVersion werden im Backend gesetzt
-});
-```
+Alle Beispiele findest du im `examples/` Ordner:
 
-### Mit Managed Identity (für Azure-Umgebungen)
+- `examples/example-unified.ts` - Vollständiges Beispiel mit allen Features
+- `examples/env.example` - Beispiel-Umgebungsvariablen
 
-```typescript
-const rag = new RAGSDK({
-  endpoint: 'https://your-resource.openai.azure.com/',
-  useManagedIdentity: true
-  // deploymentName, embeddingDeploymentName und apiVersion werden im Backend gesetzt
-});
-```
+## 📖 Dokumentation
 
-## 💻 Verwendung
-
-### Einfache Verwendung
-
-```typescript
-// 1. SDK initialisieren
-const rag = new RAGSDK({
-  endpoint: 'https://your-resource.openai.azure.com/',
-  apiKey: 'your-azure-api-key',
-  deploymentName: 'gpt-4'
-});
-
-// 2. API-Calls - direkt über Azure OpenAI
-const completion = await rag.rag.generateCompletion({
-  prompt: 'Erkläre mir RAG',
-  max_tokens: 300,
-  temperature: 0.7
-});
-
-console.log(completion.choices[0].message.content);
-```
-
-### Alle verfügbaren API-Calls
-
-```typescript
-// Text Completion (direkt über Azure OpenAI)
-const completion = await rag.rag.generateCompletion({
-  prompt: 'Erkläre RAG',
-  max_tokens: 300,
-  temperature: 0.7
-});
-
-// Embeddings (direkt über Azure OpenAI)
-const embedding = await rag.rag.createEmbeddings({
-  input: 'Text für Embeddings',
-  model: 'text-embedding-ada-002'
-});
-
-// Text chunking (eigene RAG-API über dein Backend)
-const chunks = await rag.rag.chunkText({
-  text: 'Langer Text...',
-  chunk_size: 100,
-  overlap: 20
-});
-
-// Text Summarization (eigene RAG-API über dein Backend)
-const summary = await rag.rag.summarizeText({
-  text: 'Langer Text...',
-  max_length: 100
-});
-```
-
-### Direkter Zugriff auf Azure OpenAI Client
-
-```typescript
-// Hole den Azure OpenAI Client für erweiterte Features
-const azureClient = rag.rag.getAzureClient();
-
-// Verwende Azure OpenAI Client direkt
-const chatCompletion = await azureClient.generateChatCompletion({
-  messages: [
-    { role: 'system', content: 'Du bist ein hilfreicher Assistent.' },
-    { role: 'user', content: 'Erkläre RAG' }
-  ],
-  maxTokens: 300
-});
-```
-
-### Azure OpenAI-kompatible Response-Formate
-
-```typescript
-// Completion Response (identisch zu Azure OpenAI)
-const completion = await rag.rag.generateCompletion({
-  prompt: 'Erkläre RAG'
-});
-
-// Response-Format: { choices: [{ message: { content: string } }], usage: {...} }
-console.log(completion.choices[0].message.content);
-
-// Embedding Response (identisch zu Azure OpenAI)
-const embedding = await rag.rag.createEmbeddings({
-  input: 'Text für Embeddings'
-});
-
-// Response-Format: { data: [{ embedding: number[], index: number }], usage: {...} }
-console.log(embedding.data[0].embedding);
-```
-
-### Token-Status prüfen
-
-```typescript
-// Prüfe den aktuellen Token-Status
-const status = rag.getTokenStatus();
-console.log('Token gültig bis:', status.expiresAt);
-console.log('Token läuft bald ab:', status.isExpiringSoon);
-
-// Tokens löschen
-rag.clearTokens();
-```
-
-## 🔐 Umgebungsvariablen
-
-```bash
-# OAuth2-Authentifizierung
-RAG_USERNAME=your-username
-RAG_PASSWORD=your-password
-
-# Azure OpenAI Backend (optional)
-AZURE_DEPLOYMENT=gpt-4
-AZURE_API_VERSION=2024-02-15-preview
-
-# Eigene API
-RAG_API_URL=https://your-rag-endpoint.com
-
-# Fallback API-Key
-RAG_API_KEY=your-api-key
-```
+- `docs/openai_api_sync_async.md` - Detaillierte Dokumentation zu OpenAI API Sync vs. Async
 
 ## 🧪 Tests
 
 ```bash
-# Alle Tests ausführen
 npm test
-
-# Tests im Watch-Modus
-npm run test:watch
-
-# Tests mit Coverage
 npm run test:coverage
-
-# Linting
-npm run lint
 ```
 
-## 📊 Test-Coverage
+## 🏗️ Build
 
-- **Gesamt-Coverage**: 100% ✅
-- **Auth Manager**: 100% ✅
-- **RAG SDK**: 100% ✅
-- **Azure OpenAI Integration**: 100% ✅
-
-## 🏗️ Architektur
-
-```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Deine App     │    │    RAG SDK       │    │   Backends      │
-│                 │    │   (Proxy)        │    │                 │
-│ username/pass   │───▶│  OAuth2 Auth     │───▶│ Azure OpenAI    │
-│                 │    │  Token Mgmt      │    │                 │
-│ API Calls       │───▶│  Auto Backend    │───▶│ Eigene RAG API  │
-│                 │    │  Selection       │    │                 │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
+```bash
+npm run build
+npm run clean
 ```
 
-## 🔄 Funktionsweise
+## 📁 Projektstruktur
 
-1. **Konfiguration**: SDK erstellt Azure OpenAI Client mit deinen Credentials
-2. **API-Call**: Du rufst `rag.rag.generateCompletion()` auf
-3. **Direkter Aufruf**: SDK leitet Call direkt an Azure OpenAI weiter
-4. **Response**: Du bekommst das identische Response-Format wie von Azure OpenAI
-5. **Transparenz**: Du verwendest die gleiche API wie Azure OpenAI, aber mit vereinfachter Konfiguration
+```
+├── src/
+│   ├── index.ts          # Hauptexport
+│   ├── sdk.ts            # RAG SDK Client
+│   ├── auth.ts           # OAuth2 Authentifizierung
+│   └── types.ts          # TypeScript Types & Enums
+├── examples/              # Beispiel-Code
+│   ├── example-unified.ts
+│   └── env.example
+├── docs/                  # Dokumentation
+│   └── openai_api_sync_async.md
+├── tests/                 # Test-Suite
+└── dist/                  # Build-Output
+```
 
-## 🆚 Unterschied zu Azure OpenAI
+## 🔐 Authentifizierung
 
-| Aspekt | Azure OpenAI | RAG SDK |
-|--------|--------------|---------|
-| **Konfiguration** | Komplexe Setup | Einfache Konfiguration |
-| **API-Calls** | Direkt | Direkt (über SDK) |
-| **Request-Format** | Identisch | Identisch |
-| **Response-Format** | Identisch | Identisch |
-| **Deployment** | Direkt konfiguriert | Direkt konfiguriert |
-| **Authentifizierung** | API-Key/Managed Identity | API-Key/Managed Identity |
-| **Zusätzliche Features** | Keine | RAG-spezifische Features (optional) |
+Das SDK verwendet OAuth2 mit Username/Password:
 
-## 🎯 Vorteile des neuen Ansatzes
+1. **Automatische Authentifizierung** beim ersten API-Call
+2. **Token-Refresh** bei Ablauf
+3. **Interceptors** für automatische Token-Verwaltung
 
-- **Keine HTTP-Proxy-Layer** - direkte Kommunikation mit Azure OpenAI
-- **Bessere Performance** - keine zusätzlichen Netzwerk-Hops
-- **Einfachere Konfiguration** - nur Azure OpenAI Parameter
-- **Vollständige Azure OpenAI Kompatibilität** - alle Features verfügbar
-- **Optionale RAG-Features** - nur wenn benötigt
+## 🌐 Azure OpenAI Integration
 
-## 📚 Beispiele
+- **Keine direkte Azure SDK Abhängigkeit**
+- **Backend-Proxy** für Azure OpenAI Calls
+- **Header-basierte** Parameter-Übergabe
+- **Fallback** auf eigene RAG API
 
-- **`example-unified.ts`** - Vereinigte Proxy-Architektur
+## 🔗 API-Endpunkte
 
-## 🤝 Beitragen
+Alle API-Endpunkte folgen dem Pattern `/v1/ai/...`:
 
-1. Fork das Repository
-2. Erstelle einen Feature-Branch
-3. Committe deine Änderungen
-4. Push zum Branch
-5. Erstelle einen Pull Request
+- **`/v1/ai/completions`** - Text Completion
+- **`/v1/ai/embeddings`** - Embeddings erstellen
+- **`/v1/ai/images/generations`** - Image Generation
+
+> **Hinweis**: Chunking und Summarization sind geplant, aber noch nicht implementiert.
 
 ## 📄 Lizenz
 
-MIT License - siehe [LICENSE](LICENSE) für Details.
-
-## 🔗 Links
-
-- [Azure OpenAI Service](https://azure.microsoft.com/en-us/services/cognitive-services/openai-service/)
-- [Azure OpenAI SDK](https://github.com/Azure/azure-sdk-for-js/tree/main/sdk/openai/openai)
-- [Azure Identity](https://github.com/Azure/azure-sdk-for-js/tree/main/sdk/identity/identity) 
+MIT 

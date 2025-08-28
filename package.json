@@ -1,7 +1,7 @@
 {
   "name": "rag-sdk",
   "version": "1.0.0",
-  "description": "TypeScript/JavaScript SDK für Retrieval-Augmented Generation (RAG) Services basierend auf Azure OpenAI",
+  "description": "TypeScript/JavaScript SDK für Retrieval-Augmented Generation (RAG) Services mit einfacher Authentifizierung",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
@@ -12,17 +12,13 @@
     "generate": "orval",
     "build": "tsc",
     "prepare": "npm run build",
-    "clean": "rm -rf dist coverage",
+    "clean": "rm -rf dist",
     "prebuild": "npm run clean",
     "dev": "tsc --watch",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "test:ci": "jest --ci --coverage --watchAll=false",
-    "lint": "tsc --noEmit",
-    "lint:strict": "tsc --noEmit --strict",
-    "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
-    "check-format": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\""
+    "test:ci": "jest --ci --coverage --watchAll=false"
   },
   "keywords": [
     "rag",
@@ -33,10 +29,7 @@
     "completion",
     "sdk",
     "typescript",
-    "javascript",
-    "azure",
-    "openai",
-    "microsoft"
+    "javascript"
   ],
   "author": "Your Name",
   "license": "MIT",
@@ -45,8 +38,6 @@
     "url": "https://github.com/yourusername/rag-sdk.git"
   },
   "dependencies": {
-    "@azure/identity": "^4.11.1",
-    "@azure/openai": "^1.0.0-beta.12",
     "axios": "^1.6.0"
   },
   "devDependencies": {
