@@ -6,9 +6,14 @@ async function completeRAGExample() {
   
   // RAG SDK - nur das Wesentliche
   const rag = new RAGSDK({
-    username: process.env.RAG_USERNAME || 'your-username',
+    username: process.env.RAG_USERNAME || 'testuser',
     password: process.env.RAG_PASSWORD || 'your-password',
-    baseURL: 'https://your-rag-endpoint.com',
+    baseURL: 'http://localhost:3000', // RAG API Endpoint
+    
+    // OAuth2 Konfiguration (Keycloak läuft auf localhost:8080)
+    authUrl: process.env.AUTH_URL || 'http://localhost:8080/auth/realms/rag-api-realm/protocol/openid-connect/token',
+    clientId: process.env.CLIENT_ID || 'rag-sdk-client',
+    scope: process.env.SCOPE || 'openid profile email',
     
     // Optionale Azure-Parameter (werden an Backend weitergegeben)
     deploymentName: process.env.AZURE_DEPLOYMENT || 'gpt-4',
@@ -142,6 +147,18 @@ async function configurationExamples() {
     apiVersion: '2024-02-15-preview'
   });
   console.log('✅ Azure RAG SDK erstellt (deploymentName und apiVersion werden als Headers weitergegeben)');
+
+  // Beispiel 4: Keycloak OAuth2 Konfiguration
+  console.log('\n📋 Keycloak OAuth2 Konfiguration:');
+  const keycloakRAG = new RAGSDK({
+    username: 'testuser',
+    password: 'pass',
+    baseURL: 'http://localhost:3000', // RAG API Endpoint
+    authUrl: 'http://localhost:8080/auth/realms/rag-api-realm/protocol/openid-connect/token', // Keycloak Server
+    clientId: 'rag-sdk-client',
+    scope: 'openid profile email'
+  });
+  console.log('✅ Keycloak RAG SDK erstellt (RAG API auf 3000, Keycloak auf 8080)');
 }
 
 // Beispiel für Error Handling

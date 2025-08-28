@@ -29,7 +29,7 @@ export class AuthManager {
   constructor(config: AuthConfig) {
     this.config = config;
     this.client = axios.create({
-      baseURL: config.authUrl || 'https://login.microsoftonline.com',
+      baseURL: config.authUrl || 'http://localhost:8080',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded'
       }

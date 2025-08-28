@@ -355,6 +355,12 @@ export interface RAGConfig {
   password?: string;
   /** Base URL for the RAG API */
   baseURL?: string;
+  /** OAuth2 authentication URL */
+  authUrl?: string;
+  /** OAuth2 client ID */
+  clientId?: string;
+  /** OAuth2 scope */
+  scope?: string;
   /** Azure deployment name (passed as header) */
   deploymentName?: string;
   /** Azure API version (passed as header) */

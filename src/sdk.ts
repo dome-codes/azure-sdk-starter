@@ -33,9 +33,9 @@ export class RAGClient {
       this.authManager = new AuthManager({
         username: config.username!,
         password: config.password!,
-        authUrl: 'https://login.microsoftonline.com/common/oauth2/v2.0/token',
-        clientId: 'your-client-id',
-        scope: 'openid profile email'
+        authUrl: config.authUrl || 'http://localhost:8080/auth/realms/rag-api-realm/protocol/openid-connect/token',
+        clientId: config.clientId || 'your-client-id',
+        scope: config.scope || 'openid profile email'
       });
     }
 
