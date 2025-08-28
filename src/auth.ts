@@ -32,7 +32,11 @@ export class AuthManager {
       baseURL: config.authUrl || 'http://localhost:8080',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded'
-      }
+      },
+      // SSL-Verifizierung für lokale Entwicklung deaktivieren
+      httpsAgent: new (require('https').Agent)({
+        rejectUnauthorized: false
+      })
     });
   }
 
