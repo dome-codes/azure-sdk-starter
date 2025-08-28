@@ -7,6 +7,6 @@ export type { AuthConfig, TokenResponse } from './auth';
 // Export all types and enums
 export * from './types';
 
-// Export generated types and functions
-export * from './generated/default/default';
+// Note: Generated types are not exported to avoid conflicts with our custom implementation
+// The RAG SDK provides all necessary functionality through RAGClient and RAGSDK classes
 
