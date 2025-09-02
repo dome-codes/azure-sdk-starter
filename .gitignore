@@ -18,7 +18,6 @@ src/generated/
 .env.test.local
 .env.production.local
 
-python/*
 
 # IDE
 .vscode/
@@ -66,3 +65,21 @@ jspm_packages/
 
 # Documentation (wird nicht mit gepusht)
 docs/ 
+
+# RAG System - Nur die notwendigen Dateien werden gepusht
+# Ignoriere alle RAG-System-Dateien außer der Integration
+rag-system/
+init.sql
+setup.sh
+TEST_ERGEBNIS.md
+
+# API Integration - Nur die notwendige Datei wird gepusht
+api-integration/rag_ingestion_adapter.py
+api-integration/COMPLETE_INTEGRATION_GUIDE.md
+api-integration/ERROR_HANDLING_GUIDE.md
+api-integration/INTEGRATION_WITH_EXISTING_SERVICES.md
+api-integration/METADATA_INTEGRATION_GUIDE.md
+api-integration/CORRECTED_INTEGRATION.md
+api-integration/api_integration_example.py
+api-integration/INTEGRATION_GUIDE.md
+api-integration/README.md 
