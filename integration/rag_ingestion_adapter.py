@@ -79,9 +79,71 @@ class RAGIngestionAdapter:
         self.expected_columns = ['Nr.', 'Frage', 'Antwort']
         self.optional_columns = ['Kommentar']
         
+        # Erwartete Tabellenblätter (in Reihenfolge der Priorität)
+        self.expected_sheets = ['Test_Chatbot', 'FAQ_DEUTSCH', 'FAQ_English']
+        
         logger.info("✅ RAG Ingestion Adapter (vereinfacht) erfolgreich initialisiert")
     
-    def _validate_excel_structure(self, df: pd.DataFrame, filename: str) -> tuple[List[str], List[RAGProcessingWarning]]:
+    def _find_valid_sheet(self, excel_file: Path) -> tuple[Optional[str], Optional[pd.DataFrame]]:
+        """
+        Findet das erste Tabellenblatt mit der richtigen Struktur
+        
+        Args:
+            excel_file: Pfad zur Excel-Datei
+            
+        Returns:
+            tuple: (sheet_name, dataframe) oder (None, None) wenn kein gültiges Blatt gefunden
+        """
+        try:
+            # Alle Tabellenblätter lesen
+            excel_file_obj = pd.ExcelFile(excel_file)
+            available_sheets = excel_file_obj.sheet_names
+            
+            logger.info(f"📋 Verfügbare Tabellenblätter: {available_sheets}")
+            
+            # Suche nach dem ersten Blatt mit der richtigen Struktur
+            for sheet_name in self.expected_sheets:
+                if sheet_name in available_sheets:
+                    logger.info(f"🔍 Prüfe Tabellenblatt: {sheet_name}")
+                    
+                    # Blatt lesen
+                    df = pd.read_excel(excel_file, sheet_name=sheet_name)
+                    
+                    # Prüfe ob die erwarteten Spalten vorhanden sind
+                    missing_columns = [col for col in self.expected_columns if col not in df.columns]
+                    
+                    if not missing_columns:
+                        logger.info(f"✅ Gültiges Tabellenblatt gefunden: {sheet_name}")
+                        return sheet_name, df
+                    else:
+                        logger.warning(f"⚠️ Tabellenblatt {sheet_name} hat nicht die erwartete Struktur. Fehlende Spalten: {missing_columns}")
+                        logger.info(f"📋 Verfügbare Spalten in {sheet_name}: {list(df.columns)}")
+            
+            # Wenn kein erwartetes Blatt gefunden, suche in allen Blättern
+            logger.info("🔍 Suche in allen verfügbaren Tabellenblättern...")
+            for sheet_name in available_sheets:
+                logger.info(f"🔍 Prüfe Tabellenblatt: {sheet_name}")
+                
+                # Blatt lesen
+                df = pd.read_excel(excel_file, sheet_name=sheet_name)
+                
+                # Prüfe ob die erwarteten Spalten vorhanden sind
+                missing_columns = [col for col in self.expected_columns if col not in df.columns]
+                
+                if not missing_columns:
+                    logger.info(f"✅ Gültiges Tabellenblatt gefunden: {sheet_name}")
+                    return sheet_name, df
+                else:
+                    logger.info(f"📋 Verfügbare Spalten in {sheet_name}: {list(df.columns)}")
+            
+            logger.error("❌ Kein Tabellenblatt mit der erwarteten Struktur gefunden")
+            return None, None
+            
+        except Exception as e:
+            logger.error(f"❌ Fehler beim Lesen der Excel-Datei: {str(e)}")
+            return None, None
+    
+    def _validate_excel_structure(self, df: pd.DataFrame, filename: str, sheet_name: str) -> tuple[List[str], List[RAGProcessingWarning]]:
         """
         Validiert die Excel-Struktur und gibt Fehler/Warnungen zurück
         """
@@ -97,11 +159,12 @@ class RAGIngestionAdapter:
         for optional_col in self.optional_columns:
             if optional_col not in df.columns:
                 warnings.append(RAGProcessingWarning(
-                    message=f"Optionale Spalte '{optional_col}' fehlt in der Excel-Datei",
+                    message=f"Optionale Spalte '{optional_col}' fehlt im Tabellenblatt '{sheet_name}'",
                     warning_type="missing_optional_column",
                     details={
                         'column_name': optional_col,
                         'filename': filename,
+                        'sheet_name': sheet_name,
                         'available_columns': list(df.columns),
                         'expected_columns': self.expected_columns,
                         'optional_columns': self.optional_columns
@@ -114,11 +177,12 @@ class RAGIngestionAdapter:
         
         if unknown_columns:
             warnings.append(RAGProcessingWarning(
-                message=f"Unbekannte Spalten gefunden: {', '.join(unknown_columns)}",
+                message=f"Unbekannte Spalten gefunden in '{sheet_name}': {', '.join(unknown_columns)}",
                 warning_type="unknown_columns",
                 details={
                     'unknown_columns': unknown_columns,
                     'filename': filename,
+                    'sheet_name': sheet_name,
                     'available_columns': list(df.columns),
                     'expected_columns': self.expected_columns,
                     'optional_columns': self.optional_columns,
@@ -156,7 +220,7 @@ class RAGIngestionAdapter:
         
         return qa_pairs
     
-    def _prepare_excel_content_for_ingestion(self, df: pd.DataFrame, qa_pairs: List[Dict[str, Any]]) -> str:
+    def _prepare_excel_content_for_ingestion(self, df: pd.DataFrame, qa_pairs: List[Dict[str, Any]], sheet_name: str) -> str:
         """
         Bereitet Excel-Inhalt für bestehenden Ingestion Service vor
         Konvertiert QA-Paare in Text-Format
@@ -164,7 +228,7 @@ class RAGIngestionAdapter:
         content_lines = []
         
         # Header
-        content_lines.append("# FAQ-Daten aus Excel")
+        content_lines.append(f"# FAQ-Daten aus Excel (Tabellenblatt: {sheet_name})")
         content_lines.append("")
         
         # QA-Paare als strukturierten Text
@@ -257,31 +321,50 @@ class RAGIngestionAdapter:
             with open(temp_file, 'wb') as f:
                 f.write(raw_content)
             
-            # Excel-Datei lesen
-            try:
-                df = pd.read_excel(temp_file, engine='openpyxl')
-            except Exception as e:
-                error_msg = f"Fehler beim Lesen der Excel-Datei: {str(e)}"
+            # Gültiges Tabellenblatt finden
+            sheet_name, df = self._find_valid_sheet(temp_file)
+            
+            if sheet_name is None or df is None:
+                error_msg = "Kein Tabellenblatt mit der erwarteten Struktur gefunden"
                 logger.error(f"❌ {error_msg}")
                 processing_errors.append({
                     'message': error_msg,
-                    'error_type': 'excel_read_error',
+                    'error_type': 'no_valid_sheet',
                     'details': {
                         'filename': filename,
-                        'file_size': len(raw_content),
-                        'error': str(e)
+                        'expected_sheets': self.expected_sheets,
+                        'supported_format': "Excel-Datei mit Spalten: Nr., Frage, Antwort (Kommentar optional)"
                     },
                     'timestamp': datetime.now().isoformat()
                 })
-                raise RAGProcessingError(error_msg, 'excel_read_error')
+                
+                # Erstelle Metadaten mit Fehlerinformationen
+                metadata = ExtendedDocumentMetadata(
+                    document_id=document_id,
+                    document_source=document_source,
+                    document_class=document_class,
+                    document_mime_type=document_mime_type or "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    document_internal=document_internal,
+                    description=description,
+                    filename=filename,
+                    file_size=len(raw_content),
+                    created_at=datetime.now(),
+                    processing_errors=processing_errors,
+                    processing_warnings=processing_warnings
+                )
+                
+                # Temporäre Datei löschen
+                temp_file.unlink()
+                
+                return metadata
             
             # Excel-Struktur validieren
-            missing_columns, warnings = self._validate_excel_structure(df, filename)
+            missing_columns, warnings = self._validate_excel_structure(df, filename, sheet_name)
             processing_warnings.extend([w.to_dict() for w in warnings])
             
             # Fehler bei fehlenden Pflichtspalten
             if missing_columns:
-                error_msg = f"Pflichtspalten fehlen: {', '.join(missing_columns)}"
+                error_msg = f"Pflichtspalten fehlen im Tabellenblatt '{sheet_name}': {', '.join(missing_columns)}"
                 logger.error(f"❌ {error_msg}")
                 processing_errors.append({
                     'message': error_msg,
@@ -289,6 +372,7 @@ class RAGIngestionAdapter:
                     'details': {
                         'missing_columns': missing_columns,
                         'filename': filename,
+                        'sheet_name': sheet_name,
                         'available_columns': list(df.columns),
                         'expected_columns': self.expected_columns,
                         'optional_columns': self.optional_columns,
@@ -324,17 +408,17 @@ class RAGIngestionAdapter:
             qa_pairs = self._extract_qa_pairs_from_dataframe(df)
             
             # Excel-Inhalt für bestehenden Service vorbereiten
-            prepared_content = self._prepare_excel_content_for_ingestion(df, qa_pairs)
+            prepared_content = self._prepare_excel_content_for_ingestion(df, qa_pairs, sheet_name)
             
             # Temporäre Datei löschen
             temp_file.unlink()
             
             # AN BESTEHENDEN SERVICE DELEGIEREN!
             # Der bestehende Service macht alles: Metadaten, Hash, Extraction, etc.
-            logger.info(f"🔄 Delegiere an bestehenden FAQIngestionService")
+            logger.info(f"🔄 Delegiere an bestehenden FAQIngestionService (Tabellenblatt: {sheet_name})")
             
             # Erstelle temporäre Datei mit vorbereitetem Inhalt
-            temp_content_file = Path(f"/tmp/{filename}.txt")
+            temp_content_file = Path(f"/tmp/{filename}_{sheet_name}.txt")
             with open(temp_content_file, 'w', encoding='utf-8') as f:
                 f.write(prepared_content)
             
@@ -344,7 +428,7 @@ class RAGIngestionAdapter:
             
             # Delegiere an bestehenden Service
             metadata = await self.original_service.async_ingest(
-                filename=f"{filename}.txt",  # Ändere Extension zu .txt
+                filename=f"{filename}_{sheet_name}.txt",  # Ändere Extension zu .txt
                 raw_content=prepared_raw_content,
                 documentId=document_id,
                 documentSource=document_source,
@@ -375,7 +459,7 @@ class RAGIngestionAdapter:
                 processing_warnings=processing_warnings
             )
             
-            logger.info(f"✅ Excel-Upload erfolgreich verarbeitet: {len(qa_pairs)} QA-Paare")
+            logger.info(f"✅ Excel-Upload erfolgreich verarbeitet: {len(qa_pairs)} QA-Paare aus Tabellenblatt '{sheet_name}'")
             return extended_metadata
             
         except Exception as e:
